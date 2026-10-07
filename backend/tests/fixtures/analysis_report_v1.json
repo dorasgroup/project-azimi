@@ -1,0 +1,40 @@
+{
+  "title": "تحلیل مذاکرات ایران و آمریکا",
+  "executive_summary": {
+    "text": "رسانه‌ها مذاکرات را از منظرهای متفاوت بررسی کرده‌اند.",
+    "metrics": [{"value": "۲", "label": "منبع معتبر"}]
+  },
+  "timeline": [{"date": "۱۴۰۵/۰۶/۰۱", "description": "آغاز دور جدید گفت‌وگوها"}],
+  "sources_analysis": [
+    {
+      "source_name": "نمونه خبر",
+      "articles": [
+        {
+          "date": "۱۴۰۵/۰۶/۰۱",
+          "title": "گزارش نمونه",
+          "summary": "خلاصه مستند خبر",
+          "url": "https://example.com/news/1"
+        }
+      ]
+    }
+  ],
+  "cognitive_analysis": {
+    "sub_sections": [{"title": "چارچوب روایت", "content": "تحلیل تفصیلی روایت رسانه‌ای"}],
+    "key_findings": ["روایت‌ها درباره نتیجه مذاکرات یکسان نیستند."]
+  },
+  "future_analysis": {
+    "scenarios": [
+      {
+        "title": "ادامه مذاکرات",
+        "probability": "۵۰٪",
+        "description": "گفت‌وگوها ادامه پیدا می‌کند.",
+        "implications": "فضای رسانه‌ای همچنان رقابتی خواهد بود."
+      }
+    ],
+    "key_variables": [{"name": "موضع طرفین", "description": "بر روند مذاکرات اثر مستقیم دارد."}]
+  },
+  "conclusion": "شواهد از تداوم رقابت روایی حکایت دارد.",
+  "sources": [
+    {"title": "گزارش نمونه", "url": "https://example.com/news/1", "source_name": "نمونه خبر"}
+  ]
+}

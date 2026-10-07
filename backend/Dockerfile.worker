@@ -1,0 +1,47 @@
+FROM python:3.12.14-slim-bookworm
+
+ARG GIT_SHA="unknown"
+ARG SOURCE_DIGEST="unknown"
+ARG BUILD_TIME="unknown"
+ARG APP_VERSION="0.1.0"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DEFAULT_TIMEOUT=300 \
+    PIP_RETRIES=10 \
+    GIT_SHA=${GIT_SHA} \
+    SOURCE_DIGEST=${SOURCE_DIGEST} \
+    BUILD_TIME=${BUILD_TIME} \
+    APP_VERSION=${APP_VERSION}
+
+LABEL org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.created="${BUILD_TIME}" \
+      org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.source-digest="${SOURCE_DIGEST}"
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends chromium fonts-dejavu-core \
+    && mkdir -p /opt/google/chrome \
+    && ln -s /usr/bin/chromium /opt/google/chrome/chrome \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml ./
+COPY app ./app
+# Keep package traversal independent of permissions inherited from host syncs.
+RUN chmod -R a+rX ./app
+RUN pip install --upgrade pip==26.2.1 && pip install ".[worker]"
+RUN pip install --upgrade setuptools==84.0.0 msgpack==1.2.2 \
+    && pip check \
+    # Crawl4AI 0.9.0 still declares lxml<6 although its API is compatible;
+    # 6.1.2 fixes CVE-2026-41066 in XML parsing.
+    && pip install --no-deps --upgrade lxml==6.1.2 \
+    && python -c "import lxml; from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig; assert lxml.__version__ == '6.1.2'"
+RUN useradd --create-home --uid 10001 worker
+
+USER worker
+
+CMD ["celery", "-A", "app.workers.celery_app:celery_app", "worker", "--loglevel=INFO"]

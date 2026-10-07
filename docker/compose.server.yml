@@ -1,0 +1,433 @@
+name: rasad10
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  frontend:
+    image: rasad9-frontend:api-f810be1bb71e
+    build:
+      context: ../frontend
+      args:
+        VITE_API_URL: /web-api
+    ports:
+      - "127.0.0.1:14173:5173"
+    restart: unless-stopped
+    logging: *default-logging
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    image: rasad9-api:9fda966ef816
+    build:
+      context: ../backend
+      target: runtime
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+        MIGRATION_REVISION: ${MIGRATION_REVISION:-f15a2d74c901}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    env_file:
+      - ../.env
+    environment:
+      SOURCE_DIGEST: 9fda966ef816b674c55e8efae11b7b8f54a2e8d6142a87cfe22713f8701834d4
+      PYTHONPATH: /app
+      CRAWL_EGRESS_MODE: smart
+      CRAWL_WORKER_URL: ${CRAWL_WORKER_URL:-${AI_CLOUDFLARE_WORKER_URL}}
+      CRAWL_WORKER_SECRET: ${CRAWL_WORKER_SECRET:-${AI_CLOUDFLARE_WORKER_SECRET}}
+      CRAWL_PROXY_URL: http://crawler-egress:8080
+    ports:
+      - "127.0.0.1:18010:8000"
+    volumes:
+      - ../docs:/docs:ro
+      - ../storage:/storage
+    restart: unless-stopped
+    logging: *default-logging
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rasad-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  worker:
+    image: rasad9-worker:9fda966ef816
+    profiles: ["worker"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    command: celery -A app.workers.celery_app:celery_app worker --loglevel=INFO
+    env_file:
+      - ../.env
+    environment:
+      SOURCE_DIGEST: 9fda966ef816b674c55e8efae11b7b8f54a2e8d6142a87cfe22713f8701834d4
+      PYTHONPATH: /app
+      CRAWL_EGRESS_MODE: smart
+      CRAWL_WORKER_URL: ${CRAWL_WORKER_URL:-${AI_CLOUDFLARE_WORKER_URL}}
+      CRAWL_WORKER_SECRET: ${CRAWL_WORKER_SECRET:-${AI_CLOUDFLARE_WORKER_SECRET}}
+    volumes:
+      - ../storage:/storage
+    restart: unless-stopped
+    logging: *default-logging
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rasad-redis:
+        condition: service_healthy
+      crawler-egress:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - app.workers.healthcheck
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  source-worker:
+    image: rasad9-worker:9fda966ef816
+    profiles: ["worker"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    command: celery -A app.workers.celery_app:celery_app worker -Q monitoring.source -c ${MONITORING_SOURCE_WORKER_CONCURRENCY:-5} -Ofair --loglevel=INFO -n source-worker@%h --prefetch-multiplier=1
+    env_file:
+      - ../.env
+    environment:
+      SOURCE_DIGEST: 9fda966ef816b674c55e8efae11b7b8f54a2e8d6142a87cfe22713f8701834d4
+      PYTHONPATH: /app
+      CELERY_WORKER_NAME: source-worker
+      CRAWL_EGRESS_MODE: smart
+      CRAWL_WORKER_URL: ${CRAWL_WORKER_URL:-${AI_CLOUDFLARE_WORKER_URL}}
+      CRAWL_WORKER_SECRET: ${CRAWL_WORKER_SECRET:-${AI_CLOUDFLARE_WORKER_SECRET}}
+    volumes:
+      - ../storage:/storage
+    restart: unless-stopped
+    logging: *default-logging
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rasad-redis:
+        condition: service_healthy
+      crawler-egress:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - app.workers.healthcheck
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  analysis-worker:
+    image: rasad9-worker:9fda966ef816
+    profiles: ["worker"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    command: celery -A app.workers.celery_app:celery_app worker -Q analysis.source -c ${MONITORING_ANALYSIS_WORKER_CONCURRENCY:-3} -Ofair --loglevel=INFO -n analysis-worker@%h --prefetch-multiplier=1
+    env_file:
+      - ../.env
+    environment:
+      SOURCE_DIGEST: 9fda966ef816b674c55e8efae11b7b8f54a2e8d6142a87cfe22713f8701834d4
+      PYTHONPATH: /app
+      CELERY_WORKER_NAME: analysis-worker
+    volumes:
+      - ../storage:/storage
+    restart: unless-stopped
+    logging: *default-logging
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rasad-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - app.workers.healthcheck
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  monitoring-control-worker:
+    image: rasad9-worker:9fda966ef816
+    profiles: ["worker"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    command: celery -A app.workers.celery_app:celery_app worker -Q monitoring.control -c ${MONITORING_CONTROL_WORKER_CONCURRENCY:-2} -Ofair --loglevel=INFO -n monitoring-control-worker@%h --prefetch-multiplier=1
+    env_file:
+      - ../.env
+    environment:
+      SOURCE_DIGEST: 9fda966ef816b674c55e8efae11b7b8f54a2e8d6142a87cfe22713f8701834d4
+      PYTHONPATH: /app
+      CELERY_WORKER_NAME: monitoring-control-worker
+    volumes:
+      - ../storage:/storage
+    restart: unless-stopped
+    logging: *default-logging
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rasad-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - app.workers.healthcheck
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  aggregation-worker:
+    image: rasad9-worker:9fda966ef816
+    profiles: ["worker"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    command: celery -A app.workers.celery_app:celery_app worker -Q analysis.aggregate -c ${MONITORING_AGGREGATION_WORKER_CONCURRENCY:-2} -Ofair --loglevel=INFO -n aggregation-worker@%h --prefetch-multiplier=1
+    env_file:
+      - ../.env
+    environment:
+      SOURCE_DIGEST: 9fda966ef816b674c55e8efae11b7b8f54a2e8d6142a87cfe22713f8701834d4
+      PYTHONPATH: /app
+      CELERY_WORKER_NAME: aggregation-worker
+    volumes:
+      - ../storage:/storage
+    restart: unless-stopped
+    logging: *default-logging
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rasad-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - app.workers.healthcheck
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  report-worker:
+    image: rasad9-worker:9fda966ef816
+    profiles: ["worker"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    command: celery -A app.workers.celery_app:celery_app worker -Q report.generate -c ${REPORT_WORKER_CONCURRENCY:-1} -Ofair --loglevel=INFO -n report-worker@%h --prefetch-multiplier=1
+    env_file:
+      - ../.env
+    environment:
+      SOURCE_DIGEST: 9fda966ef816b674c55e8efae11b7b8f54a2e8d6142a87cfe22713f8701834d4
+      PYTHONPATH: /app
+      CELERY_WORKER_NAME: report-worker
+    volumes:
+      - ../storage:/storage
+    restart: unless-stopped
+    logging: *default-logging
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rasad-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.workers.healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  test:
+    profiles: ["test"]
+    build:
+      context: ../backend
+      target: test
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    command: pytest -q
+    logging: *default-logging
+
+  outbox-relay:
+    image: rasad9-worker:9fda966ef816
+    profiles: ["worker"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        SOURCE_DIGEST: ${SOURCE_DIGEST:-}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    command: python -m app.shared.integration.relay --batch-size ${OUTBOX_RELAY_BATCH_SIZE:-32}
+    env_file:
+      - ../.env
+    environment:
+      SOURCE_DIGEST: 9fda966ef816b674c55e8efae11b7b8f54a2e8d6142a87cfe22713f8701834d4
+      PYTHONPATH: /app
+    restart: unless-stopped
+    logging: *default-logging
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.shared.integration.relay", "--healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  crawler-egress:
+    profiles: ["worker"]
+    build:
+      context: ./crawler-egress
+    environment:
+      EGRESS_SOCKS_PROXY: ${CRAWL_UPSTREAM_SOCKS_PROXY:-}
+    expose:
+      - "8080"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    networks:
+      - default
+    restart: unless-stopped
+    logging: *default-logging
+
+  postgres:
+    image: postgres:15.19-alpine
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rasad}
+      POSTGRES_USER: ${POSTGRES_USER:-rasad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rasad} -d ${POSTGRES_DB:-rasad}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rasad-redis:
+    image: redis:7.4.11-alpine
+    logging: *default-logging
+    command: redis-server --save "" --appendonly no
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres_data:

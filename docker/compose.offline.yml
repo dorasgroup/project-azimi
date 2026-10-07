@@ -1,0 +1,13 @@
+services:
+  frontend:
+    image: nginx:1.27-alpine
+    build: null
+    ports: !override
+      - "${FRONTEND_PORT:-5173}:80"
+    volumes:
+      - ../frontend/static:/usr/share/nginx/html:ro
+    environment: {}
+
+  api:
+    image: infrastructure-backend:latest
+    build: null

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#9E3B3B" />
+    <title>رصد و تحلیل</title>
+    <style>
+      :root { color: #412323; background: #fff8f0; font-family: Tahoma, Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; min-height: 100vh; }
+      main { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: radial-gradient(circle at 10% 10%, #ffe0cf 0, transparent 32%), radial-gradient(circle at 90% 90%, #f5c2bd 0, transparent 30%), #fff8f0; }
+      section { width: min(720px, 100%); padding: clamp(28px, 7vw, 64px); border: 1px solid rgb(158 59 59 / 14%); border-radius: 32px; background: rgb(255 255 255 / 78%); box-shadow: 0 24px 80px rgb(158 59 59 / 14%); }
+      small { color: #d25353; font-weight: 700; }
+      h1 { margin: 10px 0 0; color: #9e3b3b; font-size: clamp(34px, 7vw, 64px); line-height: 1.25; }
+      p { margin: 24px 0 32px; color: #6d5151; font-size: 17px; line-height: 2; }
+      #status { display: inline-flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 999px; color: #8b5627; background: #ffe9cf; font-size: 14px; font-weight: 700; }
+      #status.ready { color: #26663a; background: #dff4e5; }
+      #status::before { width: 9px; height: 9px; border-radius: 50%; background: currentcolor; content: ""; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <small>سامانه محلی</small>
+        <h1>رصد و تحلیل شناختی اخبار</h1>
+        <p>محیط پایه پروژه آماده است. قابلیت‌های رصد، تحلیل و گزارش در فازهای بعدی افزوده می‌شوند.</p>
+        <div id="status">در حال بررسی سرویس‌ها</div>
+      </section>
+    </main>
+    <script>
+      const status = document.querySelector("#status");
+      fetch("http://localhost:8010/api/v1/health")
+        .then((response) => response.json())
+        .then((health) => {
+          if (health.status === "ok") {
+            status.textContent = "API و پایگاه داده آماده هستند";
+            status.classList.add("ready");
+          } else {
+            status.textContent = "API در وضعیت محدود است";
+          }
+        })
+        .catch(() => {
+          status.textContent = "ارتباط با API برقرار نیست";
+        });
+    </script>
+  </body>
+</html>

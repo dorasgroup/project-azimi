@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { runStageLabel, responseClockOffset } from '../src/runPresentation.ts';
+assert.equal(runStageLabel('crawling', 'distributed_aggregating'), 'در حال جمع‌بندی');
+assert.equal(runStageLabel('crawling', 'distributed_reporting'), 'در حال تولید گزارش');
+assert.equal(runStageLabel('analyzing', 'distributed_analyzing'), 'در حال تحلیل منابع');
+assert.equal(runStageLabel('completed', 'distributed_reporting'), null);
+assert.equal(runStageLabel('failed', 'distributed_aggregating'), null);
+assert.equal(runStageLabel('pending', 'unknown'), null);
+const server = Date.parse('Sat, 03 Oct 2026 14:00:00 GMT');
+assert.equal(responseClockOffset('Sat, 03 Oct 2026 14:00:00 GMT', server - 900000), 900000);
+assert.equal(responseClockOffset('Sat, 03 Oct 2026 14:00:00 GMT', server + 900000), -900000);
+assert.equal(responseClockOffset(null, server), null);
+assert.equal(responseClockOffset('invalid', server), null);
+console.log('10 run presentation assertions passed');
