@@ -1,0 +1,258 @@
+{% extends "monitoring/base.html" %}
+{% block title %}پست‌های جمع‌آوری‌شده | رصدبان{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <span class="section-kicker">پایگاه داده محتوا</span>
+    <h1>پست‌های جمع‌آوری‌شده</h1>
+    <p>محتواهای دریافت‌شده از کانال‌های تلگرام و حساب‌های X به همراه امکان جست‌وجو، تفکیک ترندها و پاکسازی دسته‌جمعی.</p>
+  </div>
+  {% if object_list %}
+  <div class="page-header-actions">
+    <button type="button" class="btn btn-outline-danger" data-selector-open="purge-modal">
+      <span aria-hidden="true">🗑</span> پاکسازی محتواها
+    </button>
+  </div>
+  {% endif %}
+</header>
+
+<!-- Modal for Purging Content -->
+<div class="selector-modal" id="purge-modal" role="dialog" aria-modal="true" aria-labelledby="purge-modal-title" hidden>
+  <div class="selector-modal__backdrop" data-selector-close></div>
+  <section class="selector-modal__panel" tabindex="-1">
+    <header>
+      <div>
+        <span class="section-kicker">عملیات حساس</span>
+        <h3 id="purge-modal-title">پاکسازی محتواهای جمع‌آوری‌شده</h3>
+      </div>
+      <button type="button" class="modal-close" data-selector-close aria-label="بستن">×</button>
+    </header>
+    <p>آیا از پاکسازی محتواهای جمع‌آوری‌شده اطمینان دارید؟ این عملیات رکوردهای انتخاب‌شده را به طور کامل حذف خواهد کرد و قابل بازگشت نیست.</p>
+    <form method="post" action="{% url 'monitoring:post_purge' %}" class="mt-3">
+      {% csrf_token %}
+      <input type="hidden" name="q" value="{{ request.GET.q }}">
+      <input type="hidden" name="platform" value="{{ request.GET.platform }}">
+      <input type="hidden" name="source" value="{{ request.GET.source }}">
+      <input type="hidden" name="date_from" value="{{ request.GET.date_from }}">
+      <input type="hidden" name="date_to" value="{{ request.GET.date_to }}">
+      <footer>
+        <button type="button" class="btn btn-outline-primary" data-selector-close>انصراف</button>
+        <button type="submit" class="btn btn-danger">تأیید و پاکسازی کامل</button>
+      </footer>
+    </form>
+  </section>
+</div>
+
+
+<div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between p-3 mb-3 border rounded">
+  <div class="d-flex align-items-center gap-2 mb-2 mb-md-0">
+    <span style="font-size: 1.3rem;">ℹ️</span>
+    <div>
+      <strong>راهنمای رصد:</strong> این صفحه آرشیو خام کل پیام‌های دریافت‌شده از منابع است. ترندهای روز تنها شامل محتواهای مشترکی هستند که در <strong>حداقل ۲ منبع مستقل</strong> بازنشر شده باشند.
+    </div>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<section class="panel mb-3">
+  <form class="row g-2 p-3 align-items-center m-0" method="get">
+    <div class="col-md-3">
+      <input class="form-control" name="q" placeholder="جست‌وجوی متن..." value="{{ request.GET.q }}">
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="platform">
+        <option value="">همه پلتفرم‌ها</option>
+        <option value="telegram"{% if request.GET.platform == "telegram" %} selected{% endif %}>Telegram</option>
+        <option value="x"{% if request.GET.platform == "x" %} selected{% endif %}>X</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="topic">
+        <option value="">همه موضوع‌ها</option>
+        {% for topic in topics %}
+        <option value="{{ topic.pk }}"{% if request.GET.topic == topic.pk|stringformat:"s" %} selected{% endif %}>{{ topic.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="source">
+        <option value="">همه منابع</option>
+        {% for source in sources %}
+        <option value="{{ source.pk }}"{% if request.GET.source == source.pk|stringformat:"s" %} selected{% endif %}>{{ source.resolved_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-1">
+      <input class="form-control" type="date" name="date_from" value="{{ request.GET.date_from }}" aria-label="از تاریخ" title="از تاریخ">
+    </div>
+    <div class="col-md-1">
+      <input class="form-control" type="date" name="date_to" value="{{ request.GET.date_to }}" aria-label="تا تاریخ" title="تا تاریخ">
+    </div>
+    <div class="col-md-1">
+      <select class="form-select" name="trends_only">
+        <option value="">همه</option>
+        <option value="1"{% if request.GET.trends_only == "1" %} selected{% endif %}>فقط ترندها</option>
+      </select>
+    </div>
+    <div class="col-12 d-flex justify-content-end gap-2 pt-2">
+      {% if request.GET.q or request.GET.platform or request.GET.topic or request.GET.source or request.GET.date_from or request.GET.date_to or request.GET.trends_only %}
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'monitoring:post_list' %}">پاک کردن فیلترها</a>
+      {% endif %}
+      <button class="btn btn-outline-primary btn-sm" type="submit">اعمال فیلتر</button>
+    </div>
+  </form>
+</section>
+
+<!-- Bulk Actions Form -->
+<form id="bulk-delete-form" method="post" action="{% url 'monitoring:post_bulk_delete' %}">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+</form>
+
+<!-- Floating/Sticky Bulk Actions Toolbar -->
+<div class="bulk-actions-toolbar" id="bulk-actions-toolbar" style="display: none;">
+  <div class="bulk-actions-content">
+    <span class="bulk-actions-count" id="selected-count">۰ مورد انتخاب شده</span>
+    <div class="bulk-actions-buttons">
+      <button type="submit" form="bulk-delete-form" class="btn btn-danger btn-sm" onclick="return confirm('آیا از حذف موارد انتخاب‌شده اطمینان دارید؟');">
+        حذف موارد انتخاب‌شده
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="deselect-all">
+        انصراف
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Posts Table -->
+<div class="table-responsive">
+  <table class="table data-table bg-white align-middle">
+    <thead>
+      <tr>
+        <th style="width: 2.75rem; text-align: center;">
+          <input type="checkbox" id="select-all" class="form-check-input" title="انتخاب همه این صفحه" aria-label="انتخاب همه">
+        </th>
+        <th style="width: 12%;">منبع</th>
+        <th style="width: 9%;">پلتفرم</th>
+        <th style="width: 14%;">تاریخ انتشار</th>
+        <th>متن</th>
+        <th style="width: 8%;">بازدید</th>
+        <th style="width: 7%; text-align: center;">عملیات</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in object_list %}
+      <tr>
+        <td style="text-align: center;">
+          <input type="checkbox" name="selected_ids" value="{{ item.pk }}" form="bulk-delete-form" class="form-check-input post-checkbox" aria-label="انتخاب پست #{{ item.pk }}">
+        </td>
+        <td><strong>{{ item.source.resolved_name }}</strong></td>
+        <td>
+          <span class="status-badge status-badge--muted">
+            {{ item.source.get_platform_display }}
+          </span>
+        </td>
+        <td class="text-nowrap" style="font-size: 0.75rem;">{{ item.published_at|date:"Y/m/d H:i" }}</td>
+        <td>
+          {% if item.public_url %}
+          <a href="{{ item.public_url }}" target="_blank" rel="noopener" class="post-text-link">
+            {{ item.raw_text|truncatechars:120 }}
+          </a>
+          {% else %}
+          {{ item.raw_text|truncatechars:120 }}
+          {% endif %}
+          <div class="mt-1 d-flex flex-wrap gap-1 align-items-center">
+            {% with trend=item.shared_cluster %}
+              {% if trend %}
+                <a href="{% url 'monitoring:trend_cluster_detail' trend.pk %}" class="badge bg-success text-white text-decoration-none" style="font-size: 0.7rem;">
+                  {% if trend.has_special_source %}🔥 ترند منبع خاص{% else %}🔥 ترند عمومی ({{ trend.independent_source_count }} منبع){% endif %}
+                </a>
+              {% else %}
+                <span class="badge bg-light text-muted border" style="font-size: 0.68rem;" title="این محتوا فقط در ۱ منبع منتشر شده و ترند مشترک نیست">
+                  تک‌منبعی
+                </span>
+              {% endif %}
+            {% endwith %}
+            {% for match in item.keyword_matches.all %}
+            <span class="badge bg-light text-primary border" style="font-size: 0.7rem; font-weight: 500;">
+              {{ match.topic.name }}: {{ match.matched_phrase }}
+            </span>
+            {% endfor %}
+          </div>
+        </td>
+        <td>
+          <span class="badge bg-light text-dark">
+            {% if item.source.platform == "x" %}{{ item.metadata.view_count|default:"—" }}{% else %}{{ item.metadata.views|default:"—" }}{% endif %}
+          </span>
+        </td>
+        <td style="text-align: center;">
+          <form method="post" action="{% url 'monitoring:post_delete' item.pk %}" style="display:inline; margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="text-action text-action--danger" onclick="return confirm('آیا از حذف این محتوا اطمینان دارید؟');" title="حذف این محتوا">
+              حذف
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7">
+          <div class="empty-state">
+            <strong>پستی یافت نشد.</strong>
+            <p>با آغاز یک رصد تازه، محتواهای دریافت شده در این جدول نمایش داده می‌شوند.</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "monitoring/pagination.html" %}
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const selectAll = document.getElementById("select-all");
+  const checkboxes = document.querySelectorAll(".post-checkbox");
+  const toolbar = document.getElementById("bulk-actions-toolbar");
+  const countSpan = document.getElementById("selected-count");
+  const deselectBtn = document.getElementById("deselect-all");
+
+  const updateBulkToolbar = () => {
+    const checkedBoxes = document.querySelectorAll(".post-checkbox:checked");
+    const count = checkedBoxes.length;
+    if (count > 0) {
+      countSpan.textContent = count + " مورد انتخاب شده";
+      toolbar.style.display = "block";
+    } else {
+      toolbar.style.display = "none";
+    }
+    if (selectAll) {
+      selectAll.checked = checkboxes.length > 0 && count === checkboxes.length;
+      selectAll.indeterminate = count > 0 && count < checkboxes.length;
+    }
+  };
+
+  if (selectAll) {
+    selectAll.addEventListener("change", () => {
+      checkboxes.forEach(cb => cb.checked = selectAll.checked);
+      updateBulkToolbar();
+    });
+  }
+
+  checkboxes.forEach(cb => cb.addEventListener("change", updateBulkToolbar));
+
+  if (deselectBtn) {
+    deselectBtn.addEventListener("click", () => {
+      checkboxes.forEach(cb => cb.checked = false);
+      if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+      }
+      updateBulkToolbar();
+    });
+  }
+});
+</script>
+{% endblock %}

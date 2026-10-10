@@ -1,0 +1,379 @@
+{% extends "monitoring/base.html" %}
+{% block title %}جزئیات رصد | رصدبان{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <span class="section-kicker">{{ run.get_run_type_display }}</span>
+    <h1>{{ run.name }}</h1>
+    <p>
+      {% if run.cancel_requested_at and not run.is_terminal %}
+        درخواست لغو ثبت شده است؛ پس از اتمام منبع جاری، اجرا متوقف می‌شود.
+      {% else %}
+        وضعیت، پیشرفت و نتیجهٔ هر منبع را اینجا ببینید.
+      {% endif %}
+    </p>
+  </div>
+  <div class="page-header-actions">
+    <a class="btn btn-outline-primary" href="{% url 'monitoring:run_list' %}">رصد دستی</a>
+    {% if not run.is_terminal %}
+      <form method="post" action="{% url 'monitoring:run_cancel' run.pk %}">
+        {% csrf_token %}
+        {% if run.cancel_requested_at %}
+          <input type="hidden" name="force" value="true">
+          <button class="btn btn-danger" type="submit">لغو فوری رصد</button>
+        {% else %}
+          <button class="btn btn-outline-danger" type="submit">لغو رصد</button>
+        {% endif %}
+      </form>
+    {% else %}
+      <a class="btn btn-outline-danger" href="{% url 'monitoring:run_delete' run.pk %}">حذف رصد</a>
+    {% endif %}
+  </div>
+</header>
+
+<section class="panel run-detail-summary mb-4">
+  <div>
+    <span class="status-badge {% if run.status == 'success' %}status-badge--success{% elif run.status == 'partial' or run.status == 'pending' or run.status == 'running' %}status-badge--warning{% elif run.status == 'failed' %}status-badge--danger{% else %}status-badge--muted{% endif %}">
+      {% if run.status == 'running' %}<i class="run-spinner"></i>{% endif %}
+      {{ run.get_status_display }}
+    </span>
+    <strong>{{ run.name }}</strong>
+  </div>
+  <div class="run-detail-progress">
+    <div class="run-progress__meta">
+      <span>{{ run.progress_completed_count }} از {{ run.target_sources_count }} منبع پایان یافته</span>
+      <b>{{ run.progress_percent }}٪</b>
+    </div>
+    <div class="run-progress"><span style="width:{{ run.progress_percent }}%"></span></div>
+  </div>
+  <dl>
+    <div><dt>شروع</dt><dd>{{ run.started_at|date:"Y/m/d H:i"|default:"—" }}</dd></div>
+    <div><dt>پایان</dt><dd>{{ run.finished_at|date:"Y/m/d H:i"|default:"—" }}</dd></div>
+    <div><dt>محتوای جدید</dt><dd>{{ run.new_content_count }}</dd></div>
+  </dl>
+</section>
+
+{% if run.requested_start_at %}
+  <p class="detail-note">بازه درخواستی: {{ run.requested_start_at|date:"Y/m/d H:i" }} تا {{ run.requested_end_at|date:"Y/m/d H:i" }}</p>
+{% endif %}
+{% if run.selected_topics.exists %}
+  <p class="detail-note">موضوع‌های رصد شده: {% for topic in run.selected_topics.all %}<strong>{{ topic.name }}</strong>{% if not forloop.last %}، {% endif %}{% endfor %}</p>
+{% endif %}
+
+<!-- Primary Section: Detected Trends -->
+{% if run.selected_topics.exists %}
+<section class="panel mb-4 border-top border-primary border-3">
+  <header class="panel-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <span class="section-kicker">گزارش اصلی رصد</span>
+      <h2>ترندهای شناسایی‌شده در این رصد</h2>
+      <span class="panel-meta d-block mt-1">حداقل ۳ منبع عمومی، یا یک محتوای منطبق در منبع خاص، به‌عنوان ترند شناسایی می‌شود.</span>
+    </div>
+    {% if run_trends %}
+    <div>
+      <form method="post" action="{% url 'monitoring:run_bale_send' run.pk %}" class="m-0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-primary">
+          📤 ارسال ترندهای این رصد به بله
+        </button>
+      </form>
+    </div>
+    {% endif %}
+  </header>
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 12%;">موضوع</th>
+          <th style="width: 40%;">محتوای مشترک / تیتر</th>
+          <th style="width: 22%;">منابع منتشرکننده</th>
+          <th style="width: 8%;">امتیاز</th>
+          <th style="width: 10%;">وضعیت</th>
+          <th style="width: 8%; text-align: center;">عملیات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cluster in run_trends %}
+        <tr>
+          <td><span class="status-badge status-badge--success">{{ cluster.topic.name }}</span></td>
+          <td>
+            <a href="{% url 'monitoring:trend_cluster_detail' cluster.pk %}" class="fw-semibold text-dark text-decoration-none">
+              {% if cluster.representative %}{{ cluster.representative.raw_text|truncatechars:120 }}{% else %}خوشه ترند #{{ cluster.pk }}{% endif %}
+            </a>
+          </td>
+          <td>
+            <div class="d-flex flex-wrap gap-1 align-items-center">
+              <strong class="text-primary small">{{ cluster.independent_source_count }} منبع:</strong>
+              {% for m in cluster.items.all %}
+                <span class="badge bg-light text-dark border" style="font-size: 0.72rem;">{{ m.content_item.source.resolved_name }}</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td><span class="score">{{ cluster.score }}</span></td>
+          <td>
+            <span class="status-badge {% if cluster.status == 'trending' or cluster.status == 'confirmed' %}status-badge--success{% else %}status-badge--warning{% endif %}">
+              {{ cluster.get_status_display }}
+            </span>
+          </td>
+          <td style="text-align: center;">
+            <a class="text-action" href="{% url 'monitoring:trend_cluster_detail' cluster.pk %}">مشاهده جزئیات</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6">
+            <div class="p-4 text-center">
+              <div class="mb-2" style="font-size: 1.5rem;">ℹ️</div>
+              <h4 class="h6 fw-bold">هیچ ترندی در این بازه شناسایی نشد</h4>
+              <p class="text-muted small mb-0">
+                هیچ محتوایی به آستانه ۳ منبع عمومی نرسید و هیچ محتوای منطبقی در منابع خاص یافت نشد.
+              </p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<!-- Section 2: Collected Posts for This Run -->
+<section class="panel mb-4">
+  <header class="panel-header">
+    <div>
+      <span class="section-kicker">محتوای جمع‌آوری‌شده</span>
+      <h2>پست‌های جمع‌آوری‌شده در این رصد</h2>
+    </div>
+    <span class="panel-meta">{{ total_run_posts_count }} پست دریافت شده</span>
+  </header>
+
+  <!-- Filter Bar -->
+  <form class="row g-2 p-3 align-items-center m-0 border-bottom bg-light" method="get">
+    <div class="col-md-4">
+      <input class="form-control form-control-sm" name="q" placeholder="جست‌وجوی متن..." value="{{ request.GET.q }}">
+    </div>
+    <div class="col-md-2">
+      <select class="form-select form-select-sm" name="platform">
+        <option value="">همه پلتفرم‌ها</option>
+        <option value="telegram"{% if request.GET.platform == "telegram" %} selected{% endif %}>Telegram</option>
+        <option value="x"{% if request.GET.platform == "x" %} selected{% endif %}>X</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select form-select-sm" name="source">
+        <option value="">همه منابع این رصد</option>
+        {% for src in run_sources %}
+        <option value="{{ src.pk }}"{% if request.GET.source == src.pk|stringformat:"s" %} selected{% endif %}>{{ src.resolved_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select form-select-sm" name="trends_only">
+        <option value="">همه محتواها</option>
+        <option value="1"{% if request.GET.trends_only == "1" %} selected{% endif %}>فقط ترندهای مشترک</option>
+      </select>
+    </div>
+    <div class="col-md-1 d-flex gap-1">
+      <button class="btn btn-outline-primary btn-sm w-100" type="submit">فیلتر</button>
+      {% if request.GET.q or request.GET.platform or request.GET.source or request.GET.trends_only %}
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'monitoring:run_detail' run.pk %}" title="حذف فیلترها">✕</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <!-- Bulk Actions Form -->
+  <form id="bulk-delete-form" method="post" action="{% url 'monitoring:post_bulk_delete' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+  </form>
+
+  <!-- Floating/Sticky Bulk Actions Toolbar -->
+  <div class="bulk-actions-toolbar" id="bulk-actions-toolbar" style="display: none;">
+    <div class="bulk-actions-content">
+      <span class="bulk-actions-count" id="selected-count">۰ مورد انتخاب شده</span>
+      <div class="bulk-actions-buttons">
+        <button type="submit" form="bulk-delete-form" class="btn btn-danger btn-sm" onclick="return confirm('آیا از حذف موارد انتخاب‌شده اطمینان دارید؟');">
+          حذف موارد انتخاب‌شده
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="deselect-all">
+          انصراف
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 2.75rem; text-align: center;">
+            <input type="checkbox" id="select-all" class="form-check-input" title="انتخاب همه این صفحه" aria-label="انتخاب همه">
+          </th>
+          <th style="width: 14%;">منبع</th>
+          <th style="width: 9%;">پلتفرم</th>
+          <th style="width: 13%;">زمان انتشار</th>
+          <th>متن محتوا و وضعیت ترند</th>
+          <th style="width: 8%;">بازدید</th>
+          <th style="width: 8%; text-align: center;">عملیات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in posts %}
+        <tr>
+          <td style="text-align: center;">
+            <input type="checkbox" name="selected_ids" value="{{ item.pk }}" form="bulk-delete-form" class="form-check-input post-checkbox" aria-label="انتخاب پست #{{ item.pk }}">
+          </td>
+          <td><strong>{{ item.source.resolved_name }}</strong></td>
+          <td>
+            <span class="status-badge status-badge--muted">
+              {{ item.source.get_platform_display }}
+            </span>
+          </td>
+          <td class="text-nowrap" style="font-size: 0.75rem;">{{ item.published_at|date:"Y/m/d H:i" }}</td>
+          <td>
+            {% if item.public_url %}
+            <a href="{{ item.public_url }}" target="_blank" rel="noopener" class="post-text-link">
+              {{ item.raw_text|truncatechars:130 }}
+            </a>
+            {% else %}
+            {{ item.raw_text|truncatechars:130 }}
+            {% endif %}
+            <div class="mt-1 d-flex flex-wrap gap-1 align-items-center">
+              {% with trend=item.shared_cluster %}
+                {% if trend %}
+                  <a href="{% url 'monitoring:trend_cluster_detail' trend.pk %}" class="badge bg-success text-white text-decoration-none" style="font-size: 0.7rem;">
+                    {% if trend.has_special_source %}🔥 ترند منبع خاص{% else %}🔥 ترند عمومی ({{ trend.independent_source_count }} منبع){% endif %}
+                  </a>
+                {% else %}
+                  <span class="badge bg-light text-muted border" style="font-size: 0.68rem;" title="این محتوا فقط در ۱ منبع منتشر شده و ترند مشترک نیست">
+                    تک‌منبعی
+                  </span>
+                {% endif %}
+              {% endwith %}
+              {% for match in item.keyword_matches.all %}
+              <span class="badge bg-light text-primary border" style="font-size: 0.7rem; font-weight: 500;">
+                {{ match.topic.name }}: {{ match.matched_phrase }}
+              </span>
+              {% endfor %}
+            </div>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark">
+              {% if item.source.platform == "x" %}{{ item.metadata.view_count|default:"—" }}{% else %}{{ item.metadata.views|default:"—" }}{% endif %}
+            </span>
+          </td>
+          <td style="text-align: center;">
+            <form method="post" action="{% url 'monitoring:post_delete' item.pk %}" style="display:inline; margin:0;">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="text-action text-action--danger" onclick="return confirm('آیا از حذف این محتوا اطمینان دارید؟');" title="حذف این محتوا">
+                حذف
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state">
+              <strong>پستی در این رصد یافت نشد.</strong>
+              <p>محتوایی مطابق فیلترهای انتخابی در این رصد ثبت نشده است.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="p-3">
+    {% include "monitoring/pagination.html" %}
+  </div>
+</section>
+
+<!-- Section 3: Source Crawling Results -->
+<section class="panel">
+  <header class="panel-header">
+    <h2>نتیجهٔ دریافت از منابع</h2>
+    <span class="panel-meta">دریافت‌شده: {{ run.received_content_count }} · تکراری: {{ run.duplicate_content_count }} · به‌روزشده: {{ run.updated_content_count }}</span>
+  </header>
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>منبع</th>
+          <th>پلتفرم</th>
+          <th>وضعیت</th>
+          <th>دریافت</th>
+          <th>جدید</th>
+          <th>خطا</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in run.source_results.all %}
+        <tr>
+          <td>{{ item.source.resolved_name }}</td>
+          <td>{{ item.source.get_platform_display }}</td>
+          <td>{{ item.get_status_display }}</td>
+          <td>{{ item.received_count }}</td>
+          <td>{{ item.new_count }}</td>
+          <td>{{ item.error_summary|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6"><div class="empty-state">منبعی برای این رصد ثبت نشده است.</div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% block run_overlay %}{% endblock %}
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const selectAll = document.getElementById("select-all");
+  const checkboxes = document.querySelectorAll(".post-checkbox");
+  const toolbar = document.getElementById("bulk-actions-toolbar");
+  const countSpan = document.getElementById("selected-count");
+  const deselectBtn = document.getElementById("deselect-all");
+
+  const updateBulkToolbar = () => {
+    const checkedBoxes = document.querySelectorAll(".post-checkbox:checked");
+    const count = checkedBoxes.length;
+    if (count > 0) {
+      countSpan.textContent = count + " مورد انتخاب شده";
+      toolbar.style.display = "block";
+    } else {
+      toolbar.style.display = "none";
+    }
+    if (selectAll) {
+      selectAll.checked = checkboxes.length > 0 && count === checkboxes.length;
+      selectAll.indeterminate = count > 0 && count < checkboxes.length;
+    }
+  };
+
+  if (selectAll) {
+    selectAll.addEventListener("change", () => {
+      checkboxes.forEach(cb => cb.checked = selectAll.checked);
+      updateBulkToolbar();
+    });
+  }
+
+  checkboxes.forEach(cb => cb.addEventListener("change", updateBulkToolbar));
+
+  if (deselectBtn) {
+    deselectBtn.addEventListener("click", () => {
+      checkboxes.forEach(cb => cb.checked = false);
+      if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+      }
+      updateBulkToolbar();
+    });
+  }
+});
+</script>
+{% endblock %}

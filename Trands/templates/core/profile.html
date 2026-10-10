@@ -1,0 +1,80 @@
+{% extends "monitoring/base.html" %}
+
+{% block title %}پروفایل کاربری | رصدیار{% endblock %}
+
+{% block content %}
+<header class="page-header">
+  <div>
+    <span class="section-kicker">تنظیمات حساب</span>
+    <h1>پروفایل کاربری</h1>
+    <p>ویرایش نام کاربری و تغییر رمز عبور ورود به سامانه</p>
+  </div>
+  <div>
+    <a class="btn btn-outline-primary" href="{% url 'core:home' %}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 4px;" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      بازگشت به داشبورد
+    </a>
+  </div>
+</header>
+
+<section class="card form-panel form-panel--profile" style="max-width: 38rem; margin: 0 auto; width: 100%;">
+  <div class="card-body">
+    <div class="profile-avatar-banner" style="display: flex; align-items: center; gap: 1rem; padding-bottom: 1.25rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--ops-border);">
+      <span class="user-avatar" style="width: 3.25rem; height: 3.25rem; font-size: 1.3rem; border-radius: 50%;" aria-hidden="true">{{ request.user.username|first|upper }}</span>
+      <div>
+        <strong style="display: block; font-size: 1.05rem; color: var(--ops-text);">{{ request.user.get_full_name|default:request.user.username }}</strong>
+        <small style="color: var(--ops-text-muted); font-size: 0.78rem;">کاربر عملیات · دسترسی مدیریت</small>
+      </div>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      
+      <div class="field-group mb-3">
+        <label for="{{ form.username.id_for_label }}" style="display: block; margin-bottom: 0.4rem; font-weight: 700; font-size: 0.82rem; color: var(--ops-text);">
+          {{ form.username.label }} <span style="color: var(--ops-gold);">*</span>
+        </label>
+        {{ form.username }}
+        {% if form.username.help_text %}
+          <small class="form-text" style="color: var(--ops-text-muted); font-size: 0.72rem; display: block; margin-top: 0.25rem;">{{ form.username.help_text }}</small>
+        {% endif %}
+        {% if form.username.errors %}
+          <div class="text-danger mt-1" style="color: #ffb5b5; font-size: 0.78rem;">{{ form.username.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="field-group mb-3" style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px dashed var(--ops-border);">
+        <label for="{{ form.new_password.id_for_label }}" style="display: block; margin-bottom: 0.4rem; font-weight: 700; font-size: 0.82rem; color: var(--ops-text);">
+          {{ form.new_password.label }}
+        </label>
+        {{ form.new_password }}
+        {% if form.new_password.help_text %}
+          <small class="form-text" style="color: var(--ops-text-muted); font-size: 0.72rem; display: block; margin-top: 0.25rem;">{{ form.new_password.help_text }}</small>
+        {% endif %}
+        {% if form.new_password.errors %}
+          <div class="text-danger mt-1" style="color: #ffb5b5; font-size: 0.78rem;">{{ form.new_password.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="field-group mb-3">
+        <label for="{{ form.confirm_password.id_for_label }}" style="display: block; margin-bottom: 0.4rem; font-weight: 700; font-size: 0.82rem; color: var(--ops-text);">
+          {{ form.confirm_password.label }}
+        </label>
+        {{ form.confirm_password }}
+        {% if form.confirm_password.errors %}
+          <div class="text-danger mt-1" style="color: #ffb5b5; font-size: 0.78rem;">{{ form.confirm_password.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="d-flex gap-2 mt-4" style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+        <button class="btn btn-primary" type="submit" style="min-height: 2.75rem; padding: 0.5rem 1.5rem; font-weight: 800;">
+          ذخیره تغییرات
+        </button>
+        <a class="btn btn-outline-primary" href="{% url 'core:home' %}" style="min-height: 2.75rem; padding: 0.5rem 1.25rem;">
+          انصراف
+        </a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

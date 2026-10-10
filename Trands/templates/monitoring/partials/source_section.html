@@ -1,0 +1,27 @@
+<section class="panel configuration-section" aria-labelledby="{{ section_id }}">
+  <header class="panel-header configuration-section__header">
+    <div>
+      <h2 id="{{ section_id }}">{{ title }}</h2>
+      <p class="mb-0 mt-2 text-muted small">{{ description }}</p>
+    </div>
+    <span class="badge bg-light text-dark border">{{ sources|length }} منبع</span>
+  </header>
+  <div class="table-responsive">
+    <table class="table data-table bg-white align-middle" aria-label="{{ title }}">
+      <thead><tr><th style="width:30%">نام منبع</th><th style="width:20%">پلتفرم</th><th style="width:25%">شناسه</th><th style="width:10%">وضعیت</th><th style="width:15%;text-align:center">عملیات</th></tr></thead>
+      <tbody>
+        {% for item in sources %}
+        <tr>
+          <td>{% if item.public_url %}<a href="{{ item.public_url }}" target="_blank" rel="noopener" class="fw-bold text-dark text-decoration-none">{{ item.resolved_name }} ↗</a>{% else %}<strong class="text-dark">{{ item.resolved_name }}</strong>{% endif %}</td>
+          <td><span class="badge bg-light text-dark border">{{ item.get_platform_display }}</span></td>
+          <td><code class="text-primary">{{ item.identifier }}</code></td>
+          <td>{% if item.is_active %}<span class="status-badge status-badge--success">فعال</span>{% else %}<span class="status-badge status-badge--muted">غیرفعال</span>{% endif %}</td>
+          <td style="text-align:center;white-space:nowrap"><a class="text-action me-2" href="{% url 'monitoring:source_update' item.pk %}">ویرایش</a><a class="text-action text-action--danger" href="{% url 'monitoring:source_delete' item.pk %}">حذف</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5"><div class="empty-state p-4 text-center"><p class="mb-0 fw-bold">منبعی در این بخش ثبت نشده است.</p></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>

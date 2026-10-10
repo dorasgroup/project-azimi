@@ -1,0 +1,198 @@
+{% extends "monitoring/base.html" %}
+{% block title %}ترندها | رصدبان{% endblock %}
+{% block content %}
+<header class="page-header trend-list-header">
+  <div>
+    <h1>ترندهای روز</h1>
+  </div>
+  <div class="page-header-actions">
+    <form method="post" action="{% url 'monitoring:trend_analyze_now' %}">
+      {% csrf_token %}
+      <button class="btn btn-primary" type="submit">تحلیل ترند اکنون</button>
+    </form>
+  </div>
+</header>
+
+<!-- Filter Bar -->
+<section class="panel mb-3">
+  <form class="row g-2 p-3 align-items-center m-0" method="get">
+    <div class="col-md-3">
+      <select class="form-select" id="topic" name="topic">
+        <option value="">همه موضوع‌ها</option>
+        {% for topic in topics %}
+        <option value="{{ topic.pk }}" {% if request.GET.topic == topic.pk|stringformat:'s' %}selected{% endif %}>{{ topic }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" id="status" name="status">
+        <option value="">همه وضعیت‌ها</option>
+        <option value="trending"{% if request.GET.status == "trending" %} selected{% endif %}>ترند</option>
+        <option value="confirmed"{% if request.GET.status == "confirmed" %} selected{% endif %}>تأییدشده</option>
+        <option value="dismissed"{% if request.GET.status == "dismissed" %} selected{% endif %}>ردشده</option>
+        <option value="suppressed"{% if request.GET.status == "suppressed" %} selected{% endif %}>عدم ارسال</option>
+        <option value="resolved"{% if request.GET.status == "resolved" %} selected{% endif %}>پایان‌یافته</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" id="platform" name="platform">
+        <option value="">همه پلتفرم‌ها</option>
+        <option value="telegram"{% if request.GET.platform == "telegram" %} selected{% endif %}>Telegram</option>
+        <option value="x"{% if request.GET.platform == "x" %} selected{% endif %}>X</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <input class="form-control" id="min_score" type="number" min="0" max="100" name="min_score" placeholder="حداقل امتیاز" value="{{ request.GET.min_score }}">
+    </div>
+    <div class="col-md-2 d-flex gap-2">
+      <button class="btn btn-outline-primary w-100" type="submit">فیلتر</button>
+      {% if request.GET.topic or request.GET.status or request.GET.platform or request.GET.min_score %}
+      <a class="btn btn-outline-secondary" href="{% url 'monitoring:trend_cluster_list' %}">حذف فیلتر</a>
+      {% endif %}
+    </div>
+  </form>
+</section>
+
+<!-- Bulk Actions Form -->
+<form id="bulk-delete-form" method="post" action="{% url 'monitoring:trend_cluster_bulk_delete' %}">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+</form>
+
+<!-- Floating/Sticky Bulk Actions Toolbar -->
+<div class="bulk-actions-toolbar" id="bulk-actions-toolbar" style="display: none;">
+  <div class="bulk-actions-content">
+    <span class="bulk-actions-count" id="selected-count">۰ مورد انتخاب شده</span>
+    <div class="bulk-actions-buttons">
+      <button type="submit" form="bulk-delete-form" class="btn btn-danger btn-sm" onclick="return confirm('آیا از حذف موارد انتخاب‌شده اطمینان دارید؟');">
+        حذف موارد انتخاب‌شده
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="deselect-all">
+        انصراف
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Trends Table -->
+<div class="table-responsive">
+  <table class="table data-table bg-white align-middle">
+    <thead>
+      <tr>
+        <th style="width: 2.75rem; text-align: center;">
+          <input type="checkbox" id="select-all" class="form-check-input" title="انتخاب همه این صفحه" aria-label="انتخاب همه">
+        </th>
+        <th style="width: 10%;">موضوع</th>
+        <th style="width: 33%;">محتوای مشترک / خبر</th>
+        <th style="width: 20%;">منابع منتشرکننده</th>
+        <th style="width: 8%;">امتیاز</th>
+        <th style="width: 10%;">وضعیت</th>
+        <th style="width: 9%;">آخرین انتشار</th>
+        <th style="width: 10%; text-align: center;">عملیات</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in object_list %}
+      <tr>
+        <td style="text-align: center;">
+          <input type="checkbox" name="selected_ids" value="{{ c.pk }}" form="bulk-delete-form" class="form-check-input trend-checkbox" aria-label="انتخاب ترند #{{ c.pk }}">
+        </td>
+        <td>
+          <span class="status-badge status-badge--success">{{ c.topic }}</span>
+        </td>
+        <td>
+          <a href="{% url 'monitoring:trend_cluster_detail' c.pk %}" class="fw-semibold text-dark text-decoration-none">
+            {% if c.representative %}
+              {{ c.representative.raw_text|truncatechars:120 }}
+            {% else %}
+              خوشه ترند #{{ c.pk }}
+            {% endif %}
+          </a>
+        </td>
+        <td>
+          <div class="d-flex flex-wrap gap-1 align-items-center">
+            <span class="badge bg-primary text-white" style="font-size: 0.72rem;">{{ c.independent_source_count }} منبع</span>
+            {% for item in c.items.all %}
+              <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">{{ item.content_item.source.resolved_name }}</span>
+            {% endfor %}
+          </div>
+        </td>
+        <td>
+          <span class="score">{{ c.score }}</span>
+        </td>
+        <td>
+          <span class="status-badge {% if c.status == 'trending' or c.status == 'confirmed' %}status-badge--success{% elif c.status == 'candidate' %}status-badge--warning{% else %}status-badge--muted{% endif %}">
+            {{ c.get_status_display }}
+          </span>
+        </td>
+        <td class="text-nowrap" style="font-size: 0.75rem;">
+          {{ c.last_published_at|date:"Y/m/d H:i" }}
+        </td>
+        <td style="text-align: center; white-space: nowrap;">
+          <a class="text-action me-2" href="{% url 'monitoring:trend_cluster_detail' c.pk %}">مشاهده</a>
+          <form method="post" action="{% url 'monitoring:trend_cluster_delete' c.pk %}" style="display:inline; margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="text-action text-action--danger" onclick="return confirm('آیا از حذف این ترند اطمینان دارید؟');" title="حذف این ترند">
+              حذف
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8">
+          <div class="empty-state p-4 text-center">
+            <p class="mb-1 fw-bold">هیچ ترند مشترکی یافت نشد.</p>
+            <p class="text-muted small mb-0">تنها اخباری که در حداقل ۲ منبع مستقل بازنشر شده باشند در این لیست قرار می‌گیرند. فیلترها را بررسی کنید یا تحلیل تازه‌ای اجرا نمایید.</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "monitoring/pagination.html" %}
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const selectAll = document.getElementById("select-all");
+  const checkboxes = document.querySelectorAll(".trend-checkbox");
+  const toolbar = document.getElementById("bulk-actions-toolbar");
+  const countSpan = document.getElementById("selected-count");
+  const deselectBtn = document.getElementById("deselect-all");
+
+  const updateBulkToolbar = () => {
+    const checkedBoxes = document.querySelectorAll(".trend-checkbox:checked");
+    const count = checkedBoxes.length;
+    if (count > 0) {
+      countSpan.textContent = count + " مورد انتخاب شده";
+      toolbar.style.display = "block";
+    } else {
+      toolbar.style.display = "none";
+    }
+    if (selectAll) {
+      selectAll.checked = checkboxes.length > 0 && count === checkboxes.length;
+      selectAll.indeterminate = count > 0 && count < checkboxes.length;
+    }
+  };
+
+  if (selectAll) {
+    selectAll.addEventListener("change", () => {
+      checkboxes.forEach(cb => cb.checked = selectAll.checked);
+      updateBulkToolbar();
+    });
+  }
+
+  checkboxes.forEach(cb => cb.addEventListener("change", updateBulkToolbar));
+
+  if (deselectBtn) {
+    deselectBtn.addEventListener("click", () => {
+      if (selectAll) selectAll.checked = false;
+      checkboxes.forEach(cb => cb.checked = false);
+      updateBulkToolbar();
+    });
+  }
+});
+</script>
+{% endblock %}

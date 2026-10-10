@@ -1,0 +1,98 @@
+﻿{% extends "monitoring/base.html" %}
+{% block title %}موضوع‌ها و کلیدواژه‌ها | رصدبان{% endblock %}
+{% block content %}
+<header class="page-header configuration-header">
+  <div>
+    <h1>موضوع‌ها و کلیدواژه‌ها</h1>
+  </div>
+  <div class="page-header-actions">
+    <a class="btn btn-primary topic-create-action" href="{% url 'monitoring:topic_create' %}">موضوع جدید</a>
+  </div>
+</header>
+
+<section class="configuration-section panel" aria-labelledby="topics-heading">
+  <header class="panel-header configuration-section__header d-flex justify-content-between align-items-center">
+    <div>
+      <h2 id="topics-heading">فهرست موضوع‌ها</h2>
+    </div>
+    <form method="get" class="d-flex gap-2 align-items-center m-0">
+      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="جست‌وجوی موضوع یا کلیدواژه...">
+      <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">جست‌وجو</button>
+      {% if request.GET.q %}
+      <a href="{% url 'monitoring:topic_list' %}" class="btn btn-outline-secondary btn-sm text-nowrap">حذف فیلتر</a>
+      {% endif %}
+    </form>
+  </header>
+  <div class="table-responsive">
+    <table class="table data-table bg-white align-middle" aria-label="فهرست موضوع‌ها">
+      <thead>
+        <tr>
+          <th style="width: 25%;">نام موضوع</th>
+          <th style="width: 45%;">کلیدواژه‌های متصل</th>
+          <th style="width: 10%;">وضعیت</th>
+          <th style="width: 20%; text-align: center;">عملیات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in object_list %}
+        <tr>
+          <td>
+            <div>
+              <a href="{% url 'monitoring:topic_detail' item.pk %}" class="fw-bold text-primary fs-6 text-decoration-none">
+                {{ item.name }}
+              </a>
+              {% if item.description %}
+                <div class="text-muted small mt-1">{{ item.description }}</div>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <div class="d-flex flex-wrap gap-1 align-items-center">
+              <a href="{% url 'monitoring:topic_detail' item.pk %}" class="badge bg-primary text-white text-decoration-none" title="مشاهده و مدیریت کلیدواژه‌ها">
+                {{ item.keywords.count }} کلیدواژه
+              </a>
+              {% for kw in item.keywords.all|slice:":5" %}
+                <span class="badge bg-light text-dark border" style="font-size: 0.75rem;">
+                  {{ kw.phrase }}{% if kw.is_excluded %} (مستثنا){% endif %}
+                </span>
+              {% endfor %}
+              {% if item.keywords.count > 5 %}
+                <a href="{% url 'monitoring:topic_detail' item.pk %}" class="text-muted small text-decoration-none">
+                  +{{ item.keywords.count|add:"-5" }} مورد دیگر...
+                </a>
+              {% elif item.keywords.count == 0 %}
+                <span class="text-muted small fst-italic">بدون کلیدواژه (جهت افزودن وارد شوید)</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            {% if item.is_active %}
+              <span class="status-badge status-badge--success">فعال</span>
+            {% else %}
+              <span class="status-badge status-badge--muted">غیرفعال</span>
+            {% endif %}
+          </td>
+          <td style="text-align: center; white-space: nowrap;">
+            <a class="btn btn-sm btn-outline-primary me-2" href="{% url 'monitoring:topic_detail' item.pk %}">
+              مدیریت کلیدواژه‌ها ←
+            </a>
+            <a class="text-action me-2" href="{% url 'monitoring:topic_update' item.pk %}">ویرایش</a>
+            <a class="text-action text-action--danger" href="{% url 'monitoring:topic_delete' item.pk %}">حذف</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4">
+            <div class="empty-state p-4 text-center">
+              <p class="mb-1 fw-bold">هنوز هیچ موضوعی تعریف نشده است.</p>
+              <p class="text-muted small mb-0">با کلیک بر روی «موضوع جدید»، نخستین موضوع را ایجاد کنید تا به صفحهٔ افزودن کلیدواژه‌های آن هدایت شوید.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "monitoring/pagination.html" %}
+</section>
+{% endblock %}

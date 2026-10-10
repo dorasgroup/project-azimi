@@ -1,0 +1,120 @@
+{% extends "monitoring/base.html" %}
+{% block title %}ارسال به سامانه ایده‌پردازی | رصدیار{% endblock %}
+{% block content %}
+<header class="page-header idea-delivery-header">
+  <div>
+    <span class="section-kicker">پیگیری انتقال محتوا</span>
+    <h1>ارسال به سامانه ایده‌پردازی</h1>
+    <p>وضعیت دریافت هر ترند در سامانه ایده‌پردازی و ثبت نهایی آن در Dify را مستقل بررسی کنید.</p>
+  </div>
+</header>
+
+<section class="idea-feature-state {% if integration_enabled %}idea-feature-state--enabled{% else %}idea-feature-state--disabled{% endif %}" aria-live="polite">
+  <span class="idea-feature-state__icon" aria-hidden="true">
+    {% if integration_enabled %}
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    {% else %}
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+    {% endif %}
+  </span>
+  <div>
+    <strong>{% if integration_enabled %}ارسال خودکار فعال است{% else %}ارسال خارجی غیرفعال است{% endif %}</strong>
+    <p>{% if integration_enabled %}ترندهای واجد شرایط به‌صورت خودکار ارسال می‌شوند و نتیجه هر دو مرحله در این صفحه ثبت می‌شود.{% else %}رکوردهای outbox جمع‌آوری می‌شوند، اما هیچ درخواستی به سامانه خارجی ارسال نمی‌شود.{% endif %}</p>
+  </div>
+</section>
+
+<div class="kpi-grid idea-delivery-kpis">
+  <article class="kpi-card bale-kpi bale-kpi--neutral">
+    <div class="kpi-card__info"><span class="kpi-card__title">کل رکوردها</span><strong class="kpi-card__value">{{ total_count }}</strong><span class="kpi-card__subtext">ترندهای واردشده به outbox</span></div>
+    <div class="kpi-card__icon" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+  </article>
+  <article class="kpi-card bale-kpi bale-kpi--success">
+    <div class="kpi-card__info"><span class="kpi-card__title">دریافت در ایده‌پردازی</span><strong class="kpi-card__value">{{ accepted_count }}</strong><span class="kpi-card__subtext">پاسخ موفق مرحله اول</span></div>
+    <div class="kpi-card__icon" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+  </article>
+  <article class="kpi-card bale-kpi bale-kpi--success idea-kpi--dify">
+    <div class="kpi-card__info"><span class="kpi-card__title">ثبت نهایی در Dify</span><strong class="kpi-card__value">{{ indexed_count }}</strong><span class="kpi-card__subtext">نمایه‌سازی کامل‌شده</span></div>
+    <div class="kpi-card__icon" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg></div>
+  </article>
+  <article class="kpi-card bale-kpi bale-kpi--danger">
+    <div class="kpi-card__info"><span class="kpi-card__title">ناموفق</span><strong class="kpi-card__value">{{ failed_count }}</strong><span class="kpi-card__subtext">خطا در یکی از دو مرحله</span></div>
+    <div class="kpi-card__icon" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>
+  </article>
+</div>
+
+<section class="panel idea-delivery-panel" aria-labelledby="idea-delivery-table-title">
+  <div class="panel-header idea-delivery-panel__header">
+    <div><span class="section-kicker">مسیر انتقال</span><h2 id="idea-delivery-table-title">وضعیت ارسال ترندها</h2></div>
+    <div class="idea-delivery-legend" aria-label="مراحل انتقال"><span>رصدیار</span><b aria-hidden="true">←</b><span>ایده‌پردازی</span><b aria-hidden="true">←</b><span>Dify</span></div>
+  </div>
+
+  <form class="run-filter-form idea-delivery-filters" method="get">
+    <label class="idea-filter-search"><span class="visually-hidden">جست‌وجو</span><input type="search" name="q" value="{{ request.GET.q }}" placeholder="جست‌وجوی عنوان، موضوع یا شناسه…" aria-label="جست‌وجوی عنوان، موضوع یا شناسه"></label>
+    <select name="idea_status" aria-label="وضعیت سامانه ایده‌پردازی">
+      <option value="">همه وضعیت‌های ایده‌پردازی</option>
+      <option value="pending" {% if request.GET.idea_status == 'pending' %}selected{% endif %}>در انتظار</option>
+      <option value="sending" {% if request.GET.idea_status == 'sending' %}selected{% endif %}>در حال ارسال</option>
+      <option value="accepted" {% if request.GET.idea_status == 'accepted' %}selected{% endif %}>دریافت‌شده</option>
+      <option value="failed" {% if request.GET.idea_status == 'failed' %}selected{% endif %}>ناموفق</option>
+    </select>
+    <select name="dify_status" aria-label="وضعیت Dify">
+      <option value="">همه وضعیت‌های Dify</option>
+      <option value="not_started" {% if request.GET.dify_status == 'not_started' %}selected{% endif %}>شروع‌نشده</option>
+      <option value="queued" {% if request.GET.dify_status == 'queued' %}selected{% endif %}>در صف</option>
+      <option value="processing" {% if request.GET.dify_status == 'processing' %}selected{% endif %}>در حال پردازش</option>
+      <option value="document_created" {% if request.GET.dify_status == 'document_created' %}selected{% endif %}>سند ایجاد شد</option>
+      <option value="indexing" {% if request.GET.dify_status == 'indexing' %}selected{% endif %}>در حال نمایه‌سازی</option>
+      <option value="indexed" {% if request.GET.dify_status == 'indexed' %}selected{% endif %}>ثبت‌شده</option>
+      <option value="failed" {% if request.GET.dify_status == 'failed' %}selected{% endif %}>ناموفق</option>
+    </select>
+    <div class="idea-filter-actions"><button class="btn btn-outline-primary" type="submit">اعمال فیلتر</button>{% if request.GET.q or request.GET.idea_status or request.GET.dify_status %}<a class="btn btn-outline-secondary" href="{% url 'monitoring:idea_delivery_list' %}">پاک‌کردن</a>{% endif %}</div>
+  </form>
+
+  {% if object_list %}
+    <div class="table-responsive idea-delivery-table-wrap">
+      <table class="table idea-delivery-table">
+        <thead><tr><th>ترند</th><th>سامانه ایده‌پردازی</th><th>Dify</th><th>زمان شناسایی</th><th>تلاش / آخرین بررسی</th><th>جزئیات / عملیات</th></tr></thead>
+        <tbody>
+          {% for delivery in object_list %}
+            <tr>
+              <td class="idea-trend-cell">
+                <span class="idea-stage-label idea-stage-label--source"><i aria-hidden="true"></i>رصدیار</span>
+                <strong>{{ delivery.title }}</strong>
+                <span class="table-detail">{{ delivery.topic_name|default:"بدون موضوع" }}{% if delivery.score != None %} · امتیاز {{ delivery.score|floatformat:1 }}{% endif %}</span>
+                <code class="idea-source-id">{{ delivery.source_trend_id }}</code>
+              </td>
+              <td class="idea-checkpoint-cell">
+                <span class="idea-path-arrow" aria-hidden="true">←</span>
+                <span class="status-badge {% if delivery.idea_status == 'accepted' %}status-badge--success{% elif delivery.idea_status == 'failed' %}status-badge--danger{% elif delivery.idea_status == 'pending' or delivery.idea_status == 'sending' %}status-badge--warning{% else %}status-badge--muted{% endif %}">{{ delivery.get_idea_status_display }}</span>
+                <small>{% if delivery.accepted_at %}دریافت: {{ delivery.accepted_at|date:"Y/m/d H:i" }}{% elif delivery.idea_status == 'pending' %}منتظر ارسال{% else %}مرحله اول{% endif %}</small>
+              </td>
+              <td class="idea-checkpoint-cell">
+                <span class="idea-path-arrow" aria-hidden="true">←</span>
+                <span class="status-badge {% if delivery.dify_status == 'indexed' %}status-badge--success{% elif delivery.dify_status == 'failed' %}status-badge--danger{% elif delivery.dify_status == 'queued' or delivery.dify_status == 'processing' or delivery.dify_status == 'document_created' or delivery.dify_status == 'indexing' %}status-badge--warning{% else %}status-badge--muted{% endif %}">{{ delivery.get_dify_status_display }}</span>
+                <small>{% if delivery.dify_completed_at %}تکمیل: {{ delivery.dify_completed_at|date:"Y/m/d H:i" }}{% elif delivery.dify_status == 'not_started' %}پس از دریافت شروع می‌شود{% else %}مرحله دوم{% endif %}</small>
+              </td>
+              <td><time datetime="{{ delivery.detected_at|date:'c' }}">{{ delivery.detected_at|date:"Y/m/d H:i" }}</time></td>
+              <td class="idea-attempt-cell"><strong>{{ delivery.attempt_count }} تلاش</strong><small>{% if delivery.last_attempt_at %}{{ delivery.last_attempt_at|date:"Y/m/d H:i" }}{% else %}هنوز بررسی نشده{% endif %}</small></td>
+              <td class="idea-action-cell">
+                {% if delivery.error_summary %}<p class="idea-error-summary" title="خلاصه خطا">{{ delivery.error_summary|truncatechars:110 }}</p>{% endif %}
+                {% if delivery.remote_upload_id or delivery.dify_document_id %}
+                  <details class="idea-delivery-details"><summary>شناسه‌ها</summary><dl>{% if delivery.remote_upload_id %}<div><dt>فایل</dt><dd><code>{{ delivery.remote_upload_id }}</code></dd></div>{% endif %}{% if delivery.dify_document_id %}<div><dt>Dify</dt><dd><code>{{ delivery.dify_document_id }}</code></dd></div>{% endif %}</dl></details>
+                {% endif %}
+                {% if delivery.idea_status == 'failed' %}<form method="post" action="{% url 'monitoring:idea_delivery_retry' delivery.pk %}">{% csrf_token %}<button type="submit" class="btn btn-outline-primary btn-sm">تلاش دوباره</button></form>{% endif %}
+                {% if not delivery.error_summary and not delivery.remote_upload_id and not delivery.dify_document_id and delivery.idea_status != 'failed' %}<span class="text-muted">—</span>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state idea-delivery-empty">
+      <span class="idea-delivery-empty__icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-2.83 2.83-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21h-4v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06-2.83-2.83.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3v-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06 2.83-2.83.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3h4v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06 2.83 2.83-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21v4h-.09A1.65 1.65 0 0 0 19.4 15z"></path></svg></span>
+      <strong>هنوز ترندی برای ارسال ثبت نشده است.</strong>
+      <p>خوشه‌های واجد شرایط با وضعیت «ترند» یا «تأییدشده» به‌صورت خودکار در اینجا ظاهر می‌شوند.</p>
+    </div>
+  {% endif %}
+</section>
+{% include "monitoring/pagination.html" %}
+{% endblock %}

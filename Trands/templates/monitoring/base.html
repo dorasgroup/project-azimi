@@ -1,0 +1,4 @@
+{% load static %}<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{% block title %}مرکز عملیات رصد{% endblock %}</title>
+<link href="{% static 'css/app.css' %}?v=20260917-modalstackfix" rel="stylesheet"><script src="{% static 'js/app.js' %}?v=20260912-dockclickable" defer></script></head>
+<body class="app-page"><a class="skip-link" href="#main-content">رفتن به محتوای اصلی</a>{% include "monitoring/partials/sidebar.html" %}<div class="app-frame">{% include "monitoring/partials/topbar.html" %}<main id="main-content" class="app-main" tabindex="-1">{% include "monitoring/partials/messages.html" %}{% block content %}{% endblock %}</main></div><div class="sidebar-backdrop" data-sidebar-close></div></body></html>

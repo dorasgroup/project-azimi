@@ -1,0 +1,37 @@
+{% extends "monitoring/base.html" %}
+{% block title %}رصد خودکار | رصدیار{% endblock %}
+{% block content %}
+<header class="page-header automation-run-list-header">
+  <div><h1>رصدهای خودکار</h1><p>منابع، موضوع‌ها و بازه زمانی هر رصد به‌صورت مستقل قابل ویرایش است.</p></div>
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    {% if active_run %}
+    <form method="post" action="{% url 'monitoring:automation_run_stop' active_run.pk %}" class="m-0">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-danger" type="submit" onclick="return confirm('آیا از توقف رصد در حال اجرا اطمینان دارید؟');">توقف رصد #{{ active_run.pk }}</button></form>
+    {% endif %}
+    <a class="btn btn-outline-primary automation-bale-action" href="{% url 'monitoring:delivery_list' %}">ارسال به بله</a>
+  </div>
+</header>
+
+<section class="panel configuration-section mb-4">
+  <header class="panel-header"><div><h2>برنامه‌های ثبت‌شده</h2><p class="mb-0 mt-2 text-muted small">تغییر بازه زمانی یا انتخاب‌ها فقط بر اجراهای بعدی همان رصد اثر می‌گذارد.</p></div></header>
+  <div class="table-responsive"><table class="table"><thead><tr><th>شناسه</th><th>وضعیت</th><th>فاصله اجرا</th><th>بازه محتوا</th><th>منابع</th><th>موضوع‌ها</th><th>اجرای بعدی</th><th>عملیات</th></tr></thead><tbody>
+    {% for schedule in automation_schedules %}
+    <tr><td><strong>#{{ schedule.pk }}</strong></td><td><span class="status-badge {% if schedule.is_active %}status-badge--success{% else %}status-badge--muted{% endif %}">{% if schedule.is_active %}فعال{% else %}غیرفعال{% endif %}</span></td><td>{{ schedule.interval_display }}</td><td>{{ schedule.lookback_display }}</td><td>{{ schedule.sources.count }} منبع</td><td>{{ schedule.topics.count }} موضوع</td><td>{% if schedule.next_run_at %}{{ schedule.next_run_at|date:"Y/m/d H:i" }}{% else %}—{% endif %}</td><td><a class="text-action" href="{% url 'monitoring:automation_schedule_update' schedule.pk %}">ویرایش</a> <form method="post" action="{% url 'monitoring:automation_schedule_toggle' schedule.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm automation-toggle-action {% if schedule.is_active %}is-enabled{% else %}is-disabled{% endif %}" type="submit">{% if schedule.is_active %}غیرفعال‌سازی{% else %}فعال‌سازی{% endif %}</button></form> <form method="post" action="{% url 'monitoring:automation_schedule_delete' schedule.pk %}" class="d-inline">{% csrf_token %}<button class="text-action text-action--danger" type="submit" onclick="return confirm('این رصد خودکار حذف شود؟ تاریخچه اجراهای قبلی حفظ خواهد شد.');">حذف</button></form></td></tr>
+    {% empty %}<tr><td colspan="8"><div class="empty-state">هنوز رصد خودکاری ثبت نشده است.</div></td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="panel configuration-section">
+  <header class="panel-header"><h2>تاریخچه اجراها</h2></header>
+  <form id="bulk-delete-form" method="post" action="{% url 'monitoring:automation_run_bulk_delete' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  <div class="bulk-actions-toolbar" id="bulk-actions-toolbar" style="display:none;padding:.75rem 1rem"><span id="selected-count"></span> <button type="submit" form="bulk-delete-form" class="btn btn-danger btn-sm" onclick="return confirm('موارد انتخاب‌شده حذف شوند؟');">حذف</button></div>
+  <div class="table-responsive"><table class="table"><thead><tr><th><input type="checkbox" id="select-all" aria-label="انتخاب همه"></th><th>رصد</th><th>نوع</th><th>وضعیت</th><th>شروع</th><th>تحویل جدید</th><th>عملیات</th></tr></thead><tbody>
+    {% for run in object_list %}
+    <tr><td><input type="checkbox" name="selected_ids" value="{{ run.pk }}" form="bulk-delete-form" class="run-checkbox" {% if run.status == 'running' or run.status == 'pending' %}disabled{% endif %}></td><td>{% if run.schedule_id %}#{{ run.schedule_id }}{% else %}—{% endif %}</td><td>{{ run.get_trigger_display }}</td><td><span class="status-badge {% if run.status == 'success' %}status-badge--success{% elif run.status == 'failed' %}status-badge--danger{% else %}status-badge--warning{% endif %}">{{ run.get_status_display }}</span></td><td>{{ run.started_at|date:"Y/m/d H:i" }}</td><td>{{ run.deliveries_created }}</td><td><a class="text-action" href="{% url 'monitoring:automation_run_detail' run.pk %}">جزئیات</a> {% if run.status == 'running' or run.status == 'pending' %}<form method="post" action="{% url 'monitoring:automation_run_stop' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="text-action text-action--danger" style="background:none;border:0" type="submit">توقف</button></form>{% else %}<form method="post" action="{% url 'monitoring:automation_run_delete' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="text-action text-action--danger" style="background:none;border:0" type="submit">حذف</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="7"><div class="empty-state">هنوز اجرایی ثت نشده است.</div></td></tr>{% endfor %}
+  </tbody></table></div>
+  {% include "monitoring/pagination.html" %}
+</section>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{const all=document.getElementById("select-all"),boxes=[...document.querySelectorAll(".run-checkbox:not(:disabled)")],bar=document.getElementById("bulk-actions-toolbar"),count=document.getElementById("selected-count");const update=()=>{const n=boxes.filter(x=>x.checked).length;bar.style.display=n?"block":"none";count.textContent=n+" مورد انتخاب شده";all.checked=n&&n===boxes.length;all.indeterminate=n&&n<boxes.length};all?.addEventListener("change",()=>{boxes.forEach(x=>x.checked=all.checked);update()});boxes.forEach(x=>x.addEventListener("change",update))});
+</script>
+{% endblock %}

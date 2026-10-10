@@ -1,0 +1,70 @@
+{% extends "monitoring/base.html" %}
+{% block title %}مقصدهای بله | رصدبان{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <span class="section-kicker">پیام‌رسان بله</span>
+    <h1>مقصدهای بله (کانال و گروه)</h1>
+    <p>مدیریت کانال‌ها و گروه‌های دریافت‌کننده خودکار ترندهای شناسایی‌شده.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-primary" href="{% url 'monitoring:bale_destination_create' %}">افزودن مقصد جدید</a>
+    <a class="btn btn-outline-primary" href="{% url 'monitoring:delivery_list' %}">تاریخچه تحویل‌ها</a>
+  </div>
+</header>
+
+<section class="panel">
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>نام مقصد</th>
+          <th>شناسه گفت‌وگو (Chat ID)</th>
+          <th>وضعیت</th>
+          <th>عملیات و آزمایش</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for destination in object_list %}
+          <tr>
+            <td><strong>{{ destination.name }}</strong></td>
+            <td><code>{{ destination.chat_id }}</code></td>
+            <td>
+              {% if destination.is_active %}
+                <span class="pill-badge pill-badge--green">فعال</span>
+              {% else %}
+                <span class="pill-badge pill-badge--gray">غیرفعال</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-2 align-items-center">
+                <a class="text-action" href="{% url 'monitoring:bale_destination_update' destination.pk %}">ویرایش</a>
+                <a class="text-action text-action--danger" href="{% url 'monitoring:bale_destination_delete' destination.pk %}">حذف</a>
+                <form class="d-inline m-0" method="post" action="{% url 'monitoring:bale_connection_check' destination.pk %}">
+                  {% csrf_token %}
+                  <button class="btn btn-outline-primary" type="submit" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;">بررسی اتصال</button>
+                </form>
+                {% if destination.is_active %}
+                  <form class="d-inline m-0" method="post" action="{% url 'monitoring:bale_test_message' destination.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-primary" type="submit" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;">پیام آزمایشی</button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4">
+              <div class="empty-state">
+                مقصدی ثبت نشده است. از دکمه «افزودن مقصد جدید» برای تعریف کانال یا گروه بله استفاده کنید.
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+

@@ -1,0 +1,151 @@
+﻿{% extends "monitoring/base.html" %}
+{% block title %}موضوع: {{ topic.name }} | رصدبان{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <a href="{% url 'monitoring:topic_list' %}" class="text-muted text-decoration-none small">← موضوع‌ها و کلیدواژه‌ها</a>
+      <span class="text-muted">/</span>
+      <span class="badge {% if topic.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+        {% if topic.is_active %}موضوع فعال{% else %}غیرفعال{% endif %}
+      </span>
+    </div>
+    <h1>موضوع: {{ topic.name }}</h1>
+    {% if topic.description %}
+      <p class="text-muted mb-0">{{ topic.description }}</p>
+    {% else %}
+      <p class="text-muted mb-0">کلیدواژه‌های زیر برای رصد و فیلتر محتواهای مرتبط با این موضوع به کار می‌روند.</p>
+    {% endif %}
+  </div>
+  <div class="page-header-actions d-flex gap-2 align-items-center">
+    <a class="btn btn-outline-primary" href="{% url 'monitoring:topic_update' topic.pk %}">ویرایش موضوع</a>
+    <a class="btn btn-outline-secondary" href="{% url 'monitoring:topic_list' %}">بازگشت به فهرست موضوع‌ها</a>
+  </div>
+</header>
+
+<!-- Quick Add Keyword Panel -->
+<section class="panel mb-4">
+  <header class="panel-header">
+    <div>
+      <span class="section-kicker">تعریف کلیدواژه</span>
+      <h2>افزودن کلیدواژه جدید به موضوع «{{ topic.name }}»</h2>
+    </div>
+    <span class="badge bg-primary text-white">{{ keywords|length }} کلیدواژه</span>
+  </header>
+  <div class="p-3">
+    <form method="post" action="{% url 'monitoring:topic_detail' topic.pk %}" class="row g-3 align-items-end">
+      {% csrf_token %}
+      <div class="col-md-5">
+        <label for="kw-phrase" class="form-label fw-bold">عبارت کلیدواژه <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="kw-phrase" name="phrase" placeholder="مثلاً: نرخ طلاق، ازدواج جوانان، وام" required>
+        <div class="form-text">کلمه یا عبارتی که در صورت وجود در پیام، خبر به این موضوع متصل می‌شود.</div>
+      </div>
+      <div class="col-md-3">
+        <label for="kw-match-type" class="form-label fw-bold">نوع تطبیق</label>
+        <select class="form-select" id="kw-match-type" name="match_type">
+          <option value="contains" selected>شامل‌شدن در متن</option>
+          <option value="exact">عبارت دقیق</option>
+          <option value="hashtag">هشتگ</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="kw-weight" class="form-label fw-bold">وزن (اهمیت)</label>
+        <input type="number" class="form-control" id="kw-weight" name="weight" min="1" max="100" value="10">
+      </div>
+      <div class="col-md-2 d-grid">
+        <button type="submit" class="btn btn-primary">
+          + ثبت کلیدواژه
+        </button>
+      </div>
+      <div class="col-12 mt-2">
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="checkbox" id="kw-is-active" name="is_active" checked>
+          <label class="form-check-label" for="kw-is-active">کلیدواژه فعال باشد</label>
+        </div>
+        <div class="form-check form-check-inline ms-3">
+          <input class="form-check-input" type="checkbox" id="kw-is-excluded" name="is_excluded">
+          <label class="form-check-label text-danger" for="kw-is-excluded">کلیدواژه مستثنا (پیام‌های حاوی این عبارت حذف شوند)</label>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- Keywords Table Panel -->
+<section class="panel">
+  <header class="panel-header d-flex justify-content-between align-items-center">
+    <div>
+      <span class="section-kicker">فهرست کلیدواژه‌ها</span>
+      <h2>کلیدواژه‌های ثبت‌شده برای «{{ topic.name }}»</h2>
+    </div>
+    {% if keywords %}
+    <form method="get" class="d-flex gap-2 align-items-center m-0">
+      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="جست‌وجو در کلیدواژه‌ها...">
+      <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">جست‌وجو</button>
+      {% if request.GET.q %}
+      <a href="{% url 'monitoring:topic_detail' topic.pk %}" class="btn btn-outline-secondary btn-sm text-nowrap">حذف فیلتر</a>
+      {% endif %}
+    </form>
+    {% endif %}
+  </header>
+  <div class="table-responsive">
+    <table class="table data-table bg-white align-middle" aria-label="فهرست کلیدواژه‌های موضوع">
+      <thead>
+        <tr>
+          <th style="width: 35%;">عبارت کلیدواژه</th>
+          <th style="width: 20%;">نوع تطبیق</th>
+          <th style="width: 10%;">وزن</th>
+          <th style="width: 15%;">کاربرد</th>
+          <th style="width: 10%;">وضعیت</th>
+          <th style="width: 10%; text-align: center;">عملیات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for kw in keywords %}
+        <tr>
+          <td>
+            <strong dir="auto" class="fs-6">{{ kw.phrase }}</strong>
+            {% if kw.is_excluded %}
+              <span class="badge bg-danger-subtle text-danger border border-danger ms-2">مستثنا</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border">{{ kw.get_match_type_display }}</span>
+          </td>
+          <td>
+            <span class="fw-semibold">{{ kw.weight }}</span>
+          </td>
+          <td>
+            {% if kw.is_excluded %}
+              <span class="text-danger small">حذف محتوای منطبق</span>
+            {% else %}
+              <span class="text-success small">شناسایی و جذب محتوا</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if kw.is_active %}
+              <span class="status-badge status-badge--success">فعال</span>
+            {% else %}
+              <span class="status-badge status-badge--muted">غیرفعال</span>
+            {% endif %}
+          </td>
+          <td style="text-align: center; white-space: nowrap;">
+            <a class="text-action me-2" href="{% url 'monitoring:keyword_update' kw.pk %}?next={% url 'monitoring:topic_detail' topic.pk %}">ویرایش</a>
+            <a class="text-action text-action--danger" href="{% url 'monitoring:keyword_delete' kw.pk %}?next={% url 'monitoring:topic_detail' topic.pk %}">حذف</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6">
+            <div class="empty-state p-4 text-center">
+              <p class="mb-1 fw-bold">هنوز هیچ کلیدواژه‌ای برای موضوع «{{ topic.name }}» تعریف نشده است.</p>
+              <p class="text-muted small mb-0">از فرم بالای همین صفحه برای افزودن کلمات کلیدی، نام‌ها یا عبارات مرتبط با این موضوع استفاده کنید.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

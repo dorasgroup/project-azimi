@@ -1,0 +1,50 @@
+﻿{% extends "monitoring/base.html" %}
+{% block title %}منابع رصد | رصدبان{% endblock %}
+{% block content %}
+<header class="page-header configuration-header">
+  <div>
+    <h1>منابع رصد</h1>
+  </div>
+  <div class="page-header-actions">
+    <a class="btn btn-primary source-create-action" href="{% url 'monitoring:source_create' %}">+ منبع جدید</a>
+  </div>
+</header>
+
+<section class="panel mb-3">
+  <form class="row g-2 p-3 align-items-center m-0" method="get">
+    <div class="col-md-5">
+      <input class="form-control" name="q" value="{{ request.GET.q }}" placeholder="جست‌وجوی نام یا شناسه کانال...">
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="platform">
+        <option value="">همه پلتفرم‌ها</option>
+        <option value="telegram" {% if request.GET.platform == 'telegram' %}selected{% endif %}>Telegram</option>
+        <option value="x" {% if request.GET.platform == 'x' %}selected{% endif %}>X</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="importance">
+        <option value="">همه نوع‌ها</option>
+        <option value="general" {% if request.GET.importance == 'general' %}selected{% endif %}>عمومی</option>
+        <option value="special" {% if request.GET.importance == 'special' %}selected{% endif %}>خاص</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="is_active">
+        <option value="">همه وضعیت‌ها</option>
+        <option value="true" {% if request.GET.is_active == 'true' %}selected{% endif %}>فعال</option>
+        <option value="false" {% if request.GET.is_active == 'false' %}selected{% endif %}>غیرفعال</option>
+      </select>
+    </div>
+    <div class="col-md-1 d-flex gap-2">
+      <button class="btn btn-outline-primary w-100" type="submit">فیلتر</button>
+      {% if request.GET.q or request.GET.platform or request.GET.importance or request.GET.is_active %}
+      <a class="btn btn-outline-secondary" href="{% url 'monitoring:source_list' %}">حذف</a>
+      {% endif %}
+    </div>
+  </form>
+</section>
+
+{% include "monitoring/partials/source_section.html" with sources=general_sources title="منابع عمومی" description="محتوا زمانی ترند است که در حداقل ۳ منبع عمومی منتشر شده باشد." section_id="general-sources" %}
+{% include "monitoring/partials/source_section.html" with sources=special_sources title="منابع خاص" description="انطباق موضوع و کلیدواژه در هر منبع خاص، حتی با یک محتوا، به‌عنوان ترند شناسایی می‌شود." section_id="special-sources" %}
+{% endblock %}

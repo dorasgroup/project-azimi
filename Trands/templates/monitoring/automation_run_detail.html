@@ -1,0 +1,79 @@
+{% extends "monitoring/base.html" %}
+{% block title %}جزئیات رصد خودکار | رصدیار{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <span class="section-kicker">اجرای خودکار #{{ run.pk }}</span>
+    <h1>جزئیات رصد خودکار</h1>
+    <p>گزارش ترندها و نتیجهٔ همین اجرای خودکار را اینجا ببینید.</p>
+  </div>
+  <div class="page-header-actions">
+    <a class="btn btn-outline-primary" href="{% url 'monitoring:automation_run_list' %}">بازگشت به رصد خودکار</a>
+    {% if run.status == 'running' or run.status == 'pending' %}
+      <form method="post" action="{% url 'monitoring:automation_run_stop' run.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'monitoring:automation_run_detail' run.pk %}">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('آیا از توقف این رصد در حال اجرا اطمینان دارید؟');">توقف رصد</button>
+      </form>
+    {% endif %}
+  </div>
+</header>
+
+<section class="panel run-detail-summary mb-4">
+  <div>
+    <span class="status-badge {% if run.status == 'success' %}status-badge--success{% elif run.status == 'failed' %}status-badge--danger{% else %}status-badge--warning{% endif %}">{{ run.get_status_display }}</span>
+    <strong>{% if run.trigger == 'manual_pipeline' %}اجرای کامل خودکار{% else %}{{ run.get_trigger_display }}{% endif %}</strong>
+  </div>
+  <dl>
+    <div><dt>شروع</dt><dd>{{ run.started_at|date:"Y/m/d H:i"|default:"—" }}</dd></div>
+    <div><dt>پایان</dt><dd>{{ run.finished_at|date:"Y/m/d H:i"|default:"—" }}</dd></div>
+    <div><dt>ترندهای ارسال‌شده</dt><dd>{{ run.deliveries_created }}</dd></div>
+  </dl>
+</section>
+
+<p class="detail-note">منابع این اجرا: {% for source in run.selected_sources.all %}<strong>{{ source.resolved_name }}</strong>{% if not forloop.last %}، {% endif %}{% empty %}همهٔ منابع فعال{% endfor %}</p>
+<p class="detail-note">موضوع‌های این اجرا: {% for topic in run.selected_topics.all %}<strong>{{ topic.name }}</strong>{% if not forloop.last %}، {% endif %}{% empty %}همهٔ موضوع‌های فعال{% endfor %}</p>
+
+<section class="panel mb-4">
+  <header class="panel-header">
+    <div>
+      <span class="section-kicker">گزارش رصد</span>
+      <h2>ترندهای شناسایی‌شده در این اجرا</h2>
+    </div>
+  </header>
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead><tr><th>موضوع</th><th>محتوای ترند</th><th>منابع</th><th>امتیاز</th><th>وضعیت</th></tr></thead>
+      <tbody>
+        {% for cluster in run_trends %}
+        <tr>
+          <td><span class="status-badge status-badge--success">{{ cluster.topic.name }}</span></td>
+          <td>
+            <details class="automation-trend-sources">
+              <summary>{% if cluster.representative %}{{ cluster.representative.raw_text|truncatechars:160 }}{% else %}خوشه ترند #{{ cluster.pk }}{% endif %}</summary>
+              <ul>
+                {% for membership in cluster.items.all %}
+                  <li>{% if membership.content_item.public_url %}<a href="{{ membership.content_item.public_url }}" target="_blank" rel="noopener noreferrer">{{ membership.content_item.source.resolved_name }}</a>{% else %}{{ membership.content_item.source.resolved_name }}{% endif %}</li>
+                {% endfor %}
+              </ul>
+            </details>
+          </td>
+          <td>{{ cluster.independent_source_count }} منبع</td>
+          <td>{{ cluster.score }}</td>
+          <td><span class="status-badge status-badge--success">{{ cluster.get_status_display }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5"><div class="empty-state">در این اجرا ترند قابل‌ارسالی شناسایی نشد.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if run.status == 'running' or run.status == 'pending' %}
+  <p class="detail-note">گزارش در حال تکمیل است.</p>
+{% else %}
+  <p class="detail-note">تحویل بله: ایجاد {{ run.deliveries_created }} | موفق {{ run.deliveries_delivered }} | ناموفق {{ run.deliveries_failed }}</p>
+{% endif %}
+{% if run.error_summary %}<p class="text-danger">{{ run.error_summary }}</p>{% endif %}
+{% endblock %}

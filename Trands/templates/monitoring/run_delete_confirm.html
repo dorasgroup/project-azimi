@@ -1,0 +1,34 @@
+{% extends base_template %}
+
+{% block title %}تأیید حذف رصد | رصدبان{% endblock %}
+
+{% block run_overlay %}
+<section class="run-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-run-title" aria-describedby="delete-run-description">
+  <a class="run-delete-modal__backdrop" href="{{ delete_return_url }}" aria-label="بستن پنجره تأیید حذف"></a>
+  <div class="run-delete-modal__dialog" tabindex="-1">
+    <span class="section-kicker">عملیات غیرقابل بازگشت</span>
+    <h1 id="delete-run-title">حذف رصد #{{ run.pk }}</h1>
+    {% if run.is_terminal %}
+      <p id="delete-run-description">فقط رکورد این رصد و نتیجه‌های منبع آن حذف می‌شود. محتواهای جمع‌آوری‌شده، منابع، cursorها و گزارش ممیزی حفظ خواهند شد.</p>
+      <form method="post" class="run-delete-modal__actions">
+        {% csrf_token %}
+        {% if opened_from_list %}<input type="hidden" name="from" value="list">{% endif %}
+        <a class="btn btn-outline-primary" href="{{ delete_return_url }}">انصراف و بازگشت</a>
+        <button class="btn btn-outline-danger" type="submit">تأیید حذف رصد</button>
+      </form>
+    {% else %}
+      <p id="delete-run-description">این رصد هنوز در حال اجرا یا در انتظار است و حذف آن مجاز نیست. ابتدا در صورت نیاز، درخواست لغو ثبت کنید.</p>
+      <div class="run-delete-modal__actions">
+        <a class="btn btn-outline-primary" href="{{ delete_return_url }}">بازگشت</a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+<script>
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    window.location.href = "{{ delete_return_url }}";
+  }
+});
+</script>
+{% endblock %}

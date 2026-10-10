@@ -1,0 +1,13 @@
+.git
+.venv
+.testenv
+.pytest_cache
+__pycache__
+*.py[cod]
+.env
+telegram_data
+db.sqlite3
+staticfiles
+media
+postgres_data
+backups

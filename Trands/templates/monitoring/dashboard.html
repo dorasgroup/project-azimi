@@ -1,0 +1,414 @@
+{% extends "monitoring/base.html" %}
+{% block title %}داشبورد | رصدیار{% endblock %}
+{% block content %}
+<div class="dash-centered-stage">
+<h1 id="dashboard-title">داشبورد</h1>
+
+<!-- Unified monitoring switchboard -->
+<section class="dash-workspace-grid" aria-label="کنترل عملیات">
+  <article class="dash-card dash-operation-card" data-monitoring-switchboard data-mode="manual">
+    <header class="dash-operation-card__topbar">
+      <div class="dash-operation-card__heading">
+        <span class="section-kicker">کنترل عملیات</span>
+        <h2>ثبت رصد جدید</h2>
+        <p>نوع رصد را انتخاب کنید و تنظیمات همان اجرا را تکمیل کنید.</p>
+      </div>
+      <div class="dash-mode-switch" role="tablist" aria-label="انتخاب نوع رصد">
+        <button type="button" class="dash-mode-switch__option is-active" id="monitoring-mode-manual" role="tab" aria-selected="true" aria-controls="monitoring-panel-manual" data-monitoring-mode="manual">
+          <span class="dash-mode-switch__icon" aria-hidden="true">◉</span>
+          <span>رصد دستی</span>
+        </button>
+        <button type="button" class="dash-mode-switch__option" id="monitoring-mode-automatic" role="tab" aria-selected="false" aria-controls="monitoring-panel-automatic" data-monitoring-mode="automatic" tabindex="-1">
+          <span class="dash-mode-switch__icon" aria-hidden="true">↻</span>
+          <span>رصد خودکار</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="dash-mode-panel dash-mode-panel--manual" id="monitoring-panel-manual" role="tabpanel" aria-labelledby="monitoring-mode-manual" tabindex="0">
+    <div class="dash-launch-radar" aria-hidden="true"><i></i><i></i><i></i></div>
+    <header class="dash-card__header">
+      <div class="dash-card__title-group">
+        <h2>اجرای دستی رصد <span class="visually-hidden">شروع رصد جدید</span></h2>
+        <p>برای اجرای یک رصد جدید، مقادیر زیر را انتخاب کنید.</p>
+      </div>
+      <div class="dash-card__badge-action" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="6 4 20 12 6 20 6 4"></polygon>
+        </svg>
+      </div>
+    </header>
+
+    <form method="post" action="{% url 'monitoring:run_recent_days' %}" class="dash-launch-form">
+      {% csrf_token %}
+      <div class="dash-selectors-row">
+        <div class="dash-selector-field">
+          <button type="button" class="dash-picker-btn dash-picker-btn--label-only" data-selector-open="recent-days" aria-haspopup="dialog">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>بازه زمانی</span>
+            <svg class="dash-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div hidden>{{ recent_days_form.days }}</div>
+        </div>
+
+        <div class="dash-selector-field">
+          <button type="button" class="dash-picker-btn dash-picker-btn--label-only" data-selector-open="recent-sources" aria-haspopup="dialog">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            <span>منابع رصد</span>
+            <svg class="dash-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+        </div>
+
+        <div class="dash-selector-field">
+          <button type="button" class="dash-picker-btn dash-picker-btn--label-only" data-selector-open="recent-topics" aria-haspopup="dialog">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+            <span>موضوع‌ها</span>
+            <svg class="dash-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="dash-btn-gold" type="submit">
+        <svg class="dash-btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <circle cx="12" cy="12" r="5"></circle>
+          <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+        </svg>
+        <span>شروع رصد</span>
+      </button>
+
+      <div class="selector-modal" id="recent-days" role="dialog" aria-modal="true" aria-labelledby="recent-days-title" hidden>
+        <div class="selector-modal__backdrop" data-selector-close></div>
+        <section class="selector-modal__panel" tabindex="-1">
+          <header>
+            <div><span class="section-kicker">انتخاب رصد</span><h3 id="recent-days-title">بازه زمانی رصد</h3></div>
+            <button type="button" class="modal-close" data-selector-close aria-label="بستن">×</button>
+          </header>
+          <p>بازه‌ی زمانی محتوای مورد بررسی را انتخاب کنید.</p>
+          <div class="source-options recent-days-options">
+            {% for value, label in recent_days_form.days.field.choices %}
+              <label><input type="radio" name="recent-days-picker" value="{{ value }}" {% if forloop.first %}checked{% endif %}><span>{{ label }}</span></label>
+            {% endfor %}
+          </div>
+          <footer>
+            <span data-recent-days-summary>رصد {{ recent_days_form.days.value|default:1 }} روز گذشته</span>
+            <button type="button" class="btn btn-primary" data-selector-confirm>تأیید انتخاب</button>
+          </footer>
+        </section>
+      </div>
+
+      <div class="selector-modal" id="recent-sources" role="dialog" aria-modal="true" aria-labelledby="recent-sources-title" hidden>
+        <div class="selector-modal__backdrop" data-selector-close></div>
+        <section class="selector-modal__panel" tabindex="-1">
+          <header>
+            <div><span class="section-kicker">انتخاب رصد</span><h3 id="recent-sources-title">منابع رصد</h3></div>
+            <button type="button" class="modal-close" data-selector-close aria-label="بستن">×</button>
+          </header>
+          <p>فقط منابع فعال برای این اجرای دستی انتخاب می‌شوند.</p>
+          <div class="selector-bulk-actions" role="group" aria-label="انتخاب گروهی منابع">
+            <button type="button" class="btn btn-outline-primary" data-selector-bulk="all">انتخاب همه</button>
+            <button type="button" class="btn btn-outline-primary" data-selector-bulk="none">برداشتن همه</button>
+          </div>
+          <div class="source-options">{{ recent_days_form.sources }}</div>
+          <footer>
+            <span data-selector-count="recent-sources">۰ مورد انتخاب شده</span>
+            <button type="button" class="btn btn-outline-primary" data-selector-close>انصراف</button>
+            <button type="button" class="btn btn-primary" data-selector-confirm>تأیید انتخاب</button>
+          </footer>
+        </section>
+      </div>
+
+      <div class="selector-modal" id="recent-topics" role="dialog" aria-modal="true" aria-labelledby="recent-topics-title" hidden>
+        <div class="selector-modal__backdrop" data-selector-close></div>
+        <section class="selector-modal__panel" tabindex="-1">
+          <header>
+            <div><span class="section-kicker">انتخاب اختیاری</span><h3 id="recent-topics-title">موضوع‌های رصد</h3></div>
+            <button type="button" class="modal-close" data-selector-close aria-label="بستن">×</button>
+          </header>
+          <p>موضوع‌ها در سابقه این اجرا ثبت می‌شوند و تحلیل ترند را به‌تنهایی آغاز نمی‌کنند.</p>
+          <div class="source-options">{{ recent_days_form.topics }}</div>
+          <footer>
+            <span data-selector-count="recent-topics">همهٔ موضوع‌ها</span>
+            <button type="button" class="btn btn-outline-primary" data-selector-close>انصراف</button>
+            <button type="button" class="btn btn-primary" data-selector-confirm>تأیید انتخاب</button>
+          </footer>
+        </section>
+      </div>
+    </form>
+    </section>
+
+    <section class="dash-mode-panel dash-mode-panel--automatic dash-card--auto" id="monitoring-panel-automatic" role="tabpanel" aria-labelledby="monitoring-mode-automatic" tabindex="0" hidden>
+    <div class="dash-launch-radar dash-launch-radar--teal" aria-hidden="true"><i></i><i></i><i></i></div>
+    <header class="dash-card__header">
+      <div class="dash-card__title-group">
+        <h2>اجرای رصد خودکار</h2>
+        <p>بازه محتوای مورد بررسی و فاصله تکرار اجرای رصد را مشخص کنید.</p>
+      </div>
+      <div class="dash-card__badge-action dash-card__badge-action--teal" aria-hidden="true">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"></path></svg>
+      </div>
+    </header>
+
+    <form method="post" action="{% url 'monitoring:automation_configure' %}" class="dash-auto-form">
+      {% csrf_token %}
+
+      <div class="dash-compact-pickers-row dash-compact-pickers-row--automation">
+        <button type="button" class="dash-box-picker" data-selector-open="automation-sources">
+          <div class="dash-box-picker__content">
+            <span class="dash-box-picker__label">منابع</span>
+            <b class="dash-box-picker__val" data-selector-summary="automation-sources">انتخاب نشده</b>
+          </div>
+          <svg class="dash-chevron-side" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+
+        <button type="button" class="dash-box-picker" data-selector-open="automation-topics">
+          <div class="dash-box-picker__content">
+            <span class="dash-box-picker__label">موضوع‌ها</span>
+            <b class="dash-box-picker__val" data-selector-summary="automation-topics">انتخاب نشده</b>
+          </div>
+          <svg class="dash-chevron-side" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+
+        <button type="button" class="dash-box-picker" data-selector-open="automation-days" aria-haspopup="dialog">
+          <div class="dash-box-picker__content">
+            <span class="dash-box-picker__label">بازه محتوای رصد</span>
+            <b class="dash-box-picker__val" data-selector-summary="automation-days">انتخاب بازه</b>
+          </div>
+          <svg class="dash-chevron-side" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div hidden>{{ automation_monitoring_form.hours }}</div>
+
+        <button type="button" class="dash-box-picker" data-selector-open="automation-interval" aria-haspopup="dialog">
+          <div class="dash-box-picker__content">
+            <span class="dash-box-picker__label">فاصله اجرای خودکار</span>
+            <b class="dash-box-picker__val" data-selector-summary="automation-interval">انتخاب بازه</b>
+          </div>
+          <svg class="dash-chevron-side" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div hidden>{{ automation_monitoring_form.interval_hours }}</div>
+      </div>
+
+      <div class="selector-modal" id="automation-days" role="dialog" aria-modal="true" aria-labelledby="automation-days-title" hidden>
+        <div class="selector-modal__backdrop" data-selector-close></div>
+        <section class="selector-modal__panel" tabindex="-1">
+          <header>
+            <div><span class="section-kicker">تنظیمات رصد خودکار</span><h3 id="automation-days-title">بازه محتوای رصد</h3></div>
+            <button type="button" class="modal-close" data-selector-close aria-label="بستن">×</button>
+          </header>
+          <p>بازه زمانی محتوایی که در هر بار اجرای خودکار بررسی و جمع‌آوری می‌شود را انتخاب کنید.</p>
+          <div class="source-options recent-days-options">
+            <div>
+              {% for value, label in automation_monitoring_form.hours.field.choices %}
+                {% if value %}
+                  <label><input type="radio" name="automation-days-picker" value="{{ value }}" {% if automation_monitoring_form.hours.value == value %}checked{% endif %}><span>{{ label }}</span></label>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          <footer>
+            <span data-automation-days-summary>انتخاب بازه</span>
+            <button type="button" class="btn btn-outline-primary" data-selector-close>انصراف</button>
+            <button type="button" class="btn btn-primary" data-selector-confirm>تأیید انتخاب</button>
+          </footer>
+        </section>
+      </div>
+
+      <div class="selector-modal" id="automation-interval" role="dialog" aria-modal="true" aria-labelledby="automation-interval-title" hidden>
+        <div class="selector-modal__backdrop" data-selector-close></div>
+        <section class="selector-modal__panel" tabindex="-1">
+          <header>
+            <div><span class="section-kicker">تنظیمات رصد خودکار</span><h3 id="automation-interval-title">فاصله اجرای خودکار</h3></div>
+            <button type="button" class="modal-close" data-selector-close aria-label="بستن">×</button>
+          </header>
+          <p>مشخص کنید سیستم هر چند ساعت یا روز یک‌بار به صورت خودکار اقدام به رصد و ارسال ترندها به بله کند.</p>
+          <div class="source-options recent-days-options">
+            <div>
+              {% for value, label in automation_monitoring_form.interval_hours.field.choices %}
+                {% if value %}
+                  <label><input type="radio" name="automation-interval-picker" value="{{ value }}" {% if automation_monitoring_form.interval_hours.value == value %}checked{% endif %}><span>{{ label }}</span></label>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          <footer>
+            <span data-automation-interval-summary>انتخاب بازه</span>
+            <button type="button" class="btn btn-outline-primary" data-selector-close>انصراف</button>
+            <button type="button" class="btn btn-primary" data-selector-confirm>تأیید انتخاب</button>
+          </footer>
+        </section>
+      </div>
+
+      <div class="selector-modal" id="automation-sources" role="dialog" aria-modal="true" aria-labelledby="automation-sources-title" hidden>
+        <div class="selector-modal__backdrop" data-selector-close></div>
+        <section class="selector-modal__panel" tabindex="-1">
+          <header>
+            <div><span class="section-kicker">رصد جدید</span><h3 id="automation-sources-title">منابع رصد خودکار</h3></div>
+            <button type="button" class="modal-close" data-selector-close aria-label="بستن">×</button>
+          </header>
+          <p>حداقل یک منبع را برای این رصد خودکار انتخاب کنید.</p>
+          <div class="selector-bulk-actions" role="group" aria-label="انتخاب گروهی منابع">
+            <button type="button" class="btn btn-outline-primary" data-selector-bulk="all">انتخاب همه</button>
+            <button type="button" class="btn btn-outline-primary" data-selector-bulk="none">برداشتن همه</button>
+          </div>
+          <div class="source-options">{{ automation_monitoring_form.sources }}</div>
+          <footer>
+            <span data-selector-count="automation-sources">۰ مورد انتخاب شده</span>
+            <button type="button" class="btn btn-outline-primary" data-selector-close>انصراف</button>
+            <button type="button" class="btn btn-primary" data-selector-confirm>تأیید انتخاب</button>
+          </footer>
+        </section>
+      </div>
+
+      <div class="selector-modal" id="automation-topics" role="dialog" aria-modal="true" aria-labelledby="automation-topics-title" hidden>
+        <div class="selector-modal__backdrop" data-selector-close></div>
+        <section class="selector-modal__panel" tabindex="-1">
+          <header>
+            <div><span class="section-kicker">رصد جدید</span><h3 id="automation-topics-title">موضوع‌های تحلیل</h3></div>
+            <button type="button" class="modal-close" data-selector-close aria-label="بستن">×</button>
+          </header>
+          <p>حداقل یک موضوع را برای این رصد خودکار انتخاب کنید.</p>
+          <div class="source-options">{{ automation_monitoring_form.topics }}</div>
+          <footer>
+            <span data-selector-count="automation-topics">همه موضوع‌ها</span>
+            <button type="button" class="btn btn-outline-primary" data-selector-close>انصراف</button>
+            <button type="button" class="btn btn-primary" data-selector-confirm>تأیید انتخاب</button>
+          </footer>
+        </section>
+      </div>
+      <button class="dash-btn-gold dash-auto-start" type="submit">
+        <svg class="dash-btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <circle cx="12" cy="12" r="5"></circle>
+          <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+        </svg>
+        <span>شروع رصد خودکار</span>
+      </button>
+    </form>
+    </section>
+  </article>
+</section>
+</div>
+<script>
+  document.querySelectorAll("[data-selector-bulk]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const modal = button.closest(".selector-modal");
+      modal.querySelectorAll('.source-options input[type="checkbox"]').forEach((input) => {
+        input.checked = button.dataset.selectorBulk === "all";
+      });
+      modal.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  });
+  const daysSelect = document.getElementById("id_days");
+  const setDaysSummary = () => {
+    const label = daysSelect.options[daysSelect.selectedIndex].text;
+    document.querySelectorAll("[data-recent-days-summary]").forEach((summary) => { summary.textContent = label; });
+  };
+  document.querySelector('[data-selector-open="recent-days"]').addEventListener("click", () => {
+    document.querySelector(`#recent-days input[value="${daysSelect.value}"]`).checked = true;
+    setDaysSummary();
+  });
+  document.querySelectorAll('#recent-days input[type="radio"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      daysSelect.value = input.value;
+      setDaysSummary();
+    });
+  });
+
+  const autoDaysSelect = document.getElementById("id_automation_hours");
+  const setAutoDaysSummary = () => {
+    if (!autoDaysSelect) return;
+    const selectedOpt = autoDaysSelect.options[autoDaysSelect.selectedIndex];
+    const label = (selectedOpt && autoDaysSelect.value) ? selectedOpt.text : "انتخاب بازه";
+    document.querySelectorAll("[data-selector-summary='automation-days'], [data-automation-days-summary]").forEach((el) => {
+      el.textContent = label;
+    });
+  };
+  const openAutoDaysBtn = document.querySelector('[data-selector-open="automation-days"]');
+  if (openAutoDaysBtn && autoDaysSelect) {
+    openAutoDaysBtn.addEventListener("click", () => {
+      if (!autoDaysSelect.value) {
+        const firstRadio = document.querySelector('#automation-days input[type="radio"]');
+        if (firstRadio) {
+          firstRadio.checked = true;
+          autoDaysSelect.value = firstRadio.value;
+        }
+      } else {
+        const checkedInput = document.querySelector(`#automation-days input[value="${autoDaysSelect.value}"]`);
+        if (checkedInput) checkedInput.checked = true;
+      }
+      setAutoDaysSummary();
+    });
+    document.querySelectorAll('#automation-days input[type="radio"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        autoDaysSelect.value = input.value;
+        setAutoDaysSummary();
+      });
+    });
+    setAutoDaysSummary();
+  }
+
+  const autoIntervalSelect = document.getElementById("id_automation_interval_hours");
+  const setAutoIntervalSummary = () => {
+    if (!autoIntervalSelect) return;
+    const selectedOpt = autoIntervalSelect.options[autoIntervalSelect.selectedIndex];
+    const label = (selectedOpt && autoIntervalSelect.value) ? selectedOpt.text : "انتخاب بازه";
+    document.querySelectorAll("[data-selector-summary='automation-interval'], [data-automation-interval-summary]").forEach((el) => {
+      el.textContent = label;
+    });
+  };
+  const openAutoIntervalBtn = document.querySelector('[data-selector-open="automation-interval"]');
+  if (openAutoIntervalBtn && autoIntervalSelect) {
+    openAutoIntervalBtn.addEventListener("click", () => {
+      if (!autoIntervalSelect.value) {
+        const firstRadio = document.querySelector('#automation-interval input[type="radio"]');
+        if (firstRadio) {
+          firstRadio.checked = true;
+          autoIntervalSelect.value = firstRadio.value;
+        }
+      } else {
+        const checkedInput = document.querySelector(`#automation-interval input[value="${autoIntervalSelect.value}"]`);
+        if (checkedInput) checkedInput.checked = true;
+      }
+      setAutoIntervalSummary();
+    });
+    document.querySelectorAll('#automation-interval input[type="radio"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        autoIntervalSelect.value = input.value;
+        setAutoIntervalSummary();
+      });
+    });
+    setAutoIntervalSummary();
+  }
+
+  const switchboard = document.querySelector("[data-monitoring-switchboard]");
+  if (switchboard) {
+    const modeTabs = Array.from(switchboard.querySelectorAll("[data-monitoring-mode]"));
+    const setMonitoringMode = (activeTab) => {
+      const activeMode = activeTab.dataset.monitoringMode;
+      switchboard.dataset.mode = activeMode;
+      modeTabs.forEach((tab) => {
+        const isActive = tab === activeTab;
+        tab.classList.toggle("is-active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+        tab.tabIndex = isActive ? 0 : -1;
+        const panel = document.getElementById(tab.getAttribute("aria-controls"));
+        if (panel) panel.hidden = !isActive;
+      });
+    };
+    modeTabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => setMonitoringMode(tab));
+      tab.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        let nextIndex = index;
+        if (event.key === "Home") nextIndex = 0;
+        if (event.key === "End") nextIndex = modeTabs.length - 1;
+        if (event.key === "ArrowLeft") nextIndex = (index + 1) % modeTabs.length;
+        if (event.key === "ArrowRight") nextIndex = (index - 1 + modeTabs.length) % modeTabs.length;
+        setMonitoringMode(modeTabs[nextIndex]);
+        modeTabs[nextIndex].focus();
+      });
+    });
+  }
+</script>
+{% endblock %}
