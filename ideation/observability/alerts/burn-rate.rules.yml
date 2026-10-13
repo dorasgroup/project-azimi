@@ -1,0 +1,37 @@
+groups:
+  - name: SLO_Burn_Rate_Alerts
+    rules:
+      - alert: FastBurnRate_ChatAvailability
+        expr: |
+          (
+            rate(http_server_requests_total{service="ai-gateway", status=~"5.."}[5m]) 
+            / 
+            rate(http_server_requests_total{service="ai-gateway"}[5m])
+          ) > 14.4 * 0.001
+        for: 5m
+        labels:
+          severity: SEV-1
+          team: sre
+        annotations:
+          summary: "Fast burn rate for AI Gateway Availability SLO"
+          description: "Error budget is burning too fast. The system might exhaust its budget in 2 hours."
+          runbook_url: "https://wiki.internal/runbooks/ai-gateway/fast-burn"
+
+      - alert: LLMProvider_CircuitBreakerOpen
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: SEV-2
+          team: platform
+        annotations:
+          summary: "LLM Provider Circuit Breaker is OPEN"
+          description: "Provider {{ $labels.provider }} is failing. Traffic is being dropped or failed over."
+
+      - alert: Privacy_Violation_UnmaskedData
+        expr: increase(log_redaction_failures_total[5m]) > 0
+        labels:
+          severity: SEV-1
+          team: security
+        annotations:
+          summary: "Privacy Redaction Failed"
+          description: "OTel Collector failed to mask sensitive data before exporting to Loki."

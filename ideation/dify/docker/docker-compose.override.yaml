@@ -1,0 +1,19 @@
+﻿services:
+  api:
+    extra_hosts:
+      - "openrouter.ai:104.18.2.115"
+  worker:
+    extra_hosts:
+      - "openrouter.ai:104.18.2.115"
+  worker_beat:
+    extra_hosts:
+      - "openrouter.ai:104.18.2.115"
+  api_websocket:
+    extra_hosts:
+      - "openrouter.ai:104.18.2.115"
+  plugin_daemon:
+    extra_hosts:
+      - "openrouter.ai:104.18.2.115"
+  weaviate:
+    ports:
+      - "8085:8080"

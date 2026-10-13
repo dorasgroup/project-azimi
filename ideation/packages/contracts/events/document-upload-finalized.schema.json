@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.platform.internal/events/document.uploaded.v1.json",
+  "title": "Document Uploaded Event Envelope",
+  "description": "Standard Event Envelope emitted when a document is finalized in Object Storage.",
+  "type": "object",
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for idempotency"
+    },
+    "eventType": {
+      "type": "string",
+      "const": "document.upload.finalized"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tenantId": {
+      "type": "string",
+      "description": "Strict Tenant Isolation Context"
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Trace ID for OpenTelemetry"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "format": "uuid" },
+        "objectKey": { "type": "string" },
+        "checksum": { "type": "string" },
+        "sizeBytes": { "type": "integer" }
+      },
+      "required": ["documentId", "objectKey", "checksum", "sizeBytes"]
+    }
+  },
+  "required": ["eventId", "eventType", "timestamp", "tenantId", "correlationId", "payload"]
+}

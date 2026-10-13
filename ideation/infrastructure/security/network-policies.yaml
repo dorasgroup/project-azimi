@@ -1,0 +1,86 @@
+# Zero Trust / Default Deny All Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: application
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# Allow API Gateway to core-api and ai-gateway
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-gateway
+  namespace: application
+spec:
+  podSelector:
+    matchLabels:
+      app: core-api
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+---
+# Isolate Worker: No Egress to the Internet, Only Egress to RabbitMQ/Redis/Dify
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-isolation
+  namespace: application
+spec:
+  podSelector:
+    matchLabels:
+      app: ingestion-worker
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: core-api # Allow Core API to trigger async jobs
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: rabbitmq
+    - podSelector:
+        matchLabels:
+          app: redis
+    - podSelector:
+        matchLabels:
+          app: object-storage
+---
+# Isolate Databases
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-isolation
+  namespace: data
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: application
+      podSelector:
+        matchLabels:
+          app: core-api
+    - namespaceSelector:
+        matchLabels:
+          name: application
+      podSelector:
+        matchLabels:
+          app: ingestion-worker

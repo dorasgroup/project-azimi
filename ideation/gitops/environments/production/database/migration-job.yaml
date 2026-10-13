@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: database-migration-hook
+  namespace: data
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      containers:
+      - name: migration-runner
+        image: ai-platform/db-migrator:latest-digest # Specific digest dynamically updated
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: dsn
+        command: ["npm", "run", "db:migrate"]
+      restartPolicy: Never
+  backoffLimit: 1

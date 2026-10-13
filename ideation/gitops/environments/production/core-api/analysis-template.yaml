@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: application
+spec:
+  metrics:
+  - name: success-rate
+    interval: 1m
+    count: 3
+    successCondition: result[0] >= 0.99 # Rollback automatically if success rate < 99%
+    provider:
+      prometheus:
+        address: http://prometheus.obs-net.svc.cluster.local:9090
+        query: |
+          sum(rate(http_server_requests_total{service="core-api", status=~"2..|3.."}[1m])) 
+          / 
+          sum(rate(http_server_requests_total{service="core-api"}[1m]))

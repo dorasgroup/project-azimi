@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: core-api
+  namespace: application
+spec:
+  replicas: 4
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: core-api
+  template:
+    metadata:
+      labels:
+        app: core-api
+    spec:
+      containers:
+      - name: core-api
+        image: ai-platform/core-api:sha256-abcdef123456... # Controlled by CI Pipeline
+        ports:
+        - containerPort: 3000
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 3000
+          initialDelaySeconds: 5
+  strategy:
+    canary:
+      analysis:
+        templates:
+        - templateName: success-rate
+        startingStep: 2 # Start analysis after 10% traffic
+      steps:
+      - setWeight: 5
+      - pause: {duration: 1m} # Let metrics gather
+      - setWeight: 10
+      - pause: {duration: 5m} # Trigger automated Prometheus analysis
+      - setWeight: 50
+      - pause: {duration: 10m}
+      - setWeight: 100

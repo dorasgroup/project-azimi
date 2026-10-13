@@ -1,0 +1,55 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: enforce-pod-security-standards
+  annotations:
+    policies.kyverno.io/title: Enforce Pod Security
+    policies.kyverno.io/description: >-
+      Ensures that all pods run as non-root, forbids privileged containers, 
+      and prevents the use of the "latest" image tag in Production.
+spec:
+  validationFailureAction: Enforce # Blocks deployment if policy is violated
+  background: true
+  rules:
+  # 1. Block 'latest' image tag
+  - name: require-specific-image-tag
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Using 'latest' tag is strictly forbidden. Please pin the image version or use a digest."
+      pattern:
+        spec:
+          containers:
+          - image: "!*:latest"
+
+  # 2. Block Privileged Containers
+  - name: disallow-privileged-containers
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Privileged containers are not allowed."
+      pattern:
+        spec:
+          containers:
+          - securityContext:
+              privileged: false
+
+  # 3. Require Non-Root execution
+  - name: require-run-as-non-root
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Running as root is not allowed. Must set runAsNonRoot: true"
+      pattern:
+        spec:
+          securityContext:
+            runAsNonRoot: true

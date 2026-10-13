@@ -1,0 +1,11 @@
+[Unit]
+Description=Synchronize published Haminyar articles into Ideation and Dify
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec infrastructure-backend-1 python -m app.integrations.haminyar.sync --max-articles 50
+TimeoutStartSec=10min
+Nice=10

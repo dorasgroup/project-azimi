@@ -1,0 +1,57 @@
+global:
+  resolve_timeout: 5m
+  # Default PagerDuty integration key for fallback
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+route:
+  group_by: ['alertname', 'service', 'tier']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-slack'
+
+  routes:
+    # ---------------------------------------------------------
+    # TIER 0 & TIER 1 - SEV-1/SEV-2 ALERTS (Wake up On-call)
+    # ---------------------------------------------------------
+    - matchers:
+        - severity="page"
+        - tier=~"tier-0|tier-1"
+      receiver: 'pagerduty-critical'
+      continue: true # Also send to Slack for visibility
+
+    - matchers:
+        - severity="page"
+        - tier=~"tier-0|tier-1"
+      receiver: 'slack-incidents-critical'
+
+    # ---------------------------------------------------------
+    # TIER 2 & TIER 3 - TICKET / WARNING ALERTS (Business Hours)
+    # ---------------------------------------------------------
+    - matchers:
+        - severity="ticket"
+      receiver: 'jira-integration'
+
+receivers:
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - routing_key: '<SECRET_PAGERDUTY_KEY>' # Injected via External Secrets
+        severity: 'critical'
+
+  - name: 'slack-incidents-critical'
+    slack_configs:
+      - api_url: '<SECRET_SLACK_WEBHOOK>'
+        channel: '#incidents-critical'
+        title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+        text: >-
+          *Impact:* {{ .CommonAnnotations.impact }}
+          *Runbook:* {{ .CommonAnnotations.runbook }}
+
+  - name: 'jira-integration'
+    webhook_configs:
+      - url: 'http://jira-alert-bridge.infrastructure.svc:8080/create-ticket'
+
+  - name: 'default-slack'
+    slack_configs:
+      - api_url: '<SECRET_SLACK_WEBHOOK>'
+        channel: '#alerts-general'

@@ -1,0 +1,48 @@
+groups:
+  - name: ai_gateway_slos
+    rules:
+      # Indicator: Time to First Token (TTFT) for AI Gateway
+      # Target: 99% of chat stream requests must have a TTFT of < 2.0s
+      - record: job:ai_gateway_ttft_success:rate5m
+        expr: sum(rate(ai_gateway_ttft_seconds_bucket{le="2.0"}[5m])) by (job)
+      
+      - record: job:ai_gateway_ttft_total:rate5m
+        expr: sum(rate(ai_gateway_ttft_seconds_count[5m])) by (job)
+
+      # ---------------------------------------------------------
+      # MULTI-BURN RATE ALERTS (SRE Best Practice)
+      # ---------------------------------------------------------
+      
+      # 1. FAST BURN ALERT (Page immediately - SEV-1/SEV-2)
+      # Burns 5% of the 30-day error budget in 1 hour
+      - alert: AIGatewayHighTTFTFastBurn
+        expr: (
+            1 - (job:ai_gateway_ttft_success:rate1h / job:ai_gateway_ttft_total:rate1h)
+          ) > (1 - 0.99) * 36
+        for: 15m
+        labels:
+          severity: page
+          service: ai-gateway
+          tier: tier-1
+          owner: ai-platform-team
+        annotations:
+          summary: "AI Gateway TTFT is burning budget too fast (1h window)"
+          runbook: "https://runbooks.internal/ai-gateway/high-ttft"
+          impact: "Users are experiencing severe latency before seeing the first word in chats."
+
+      # 2. SLOW BURN ALERT (Ticket only - SEV-3/SEV-4)
+      # Burns 10% of the 30-day error budget in 3 days
+      - alert: AIGatewayHighTTFTSlowBurn
+        expr: (
+            1 - (job:ai_gateway_ttft_success:rate3d / job:ai_gateway_ttft_total:rate3d)
+          ) > (1 - 0.99) * 1
+        for: 6h
+        labels:
+          severity: ticket
+          service: ai-gateway
+          tier: tier-1
+          owner: ai-platform-team
+        annotations:
+          summary: "AI Gateway TTFT slow burn detected (3d window)"
+          runbook: "https://runbooks.internal/ai-gateway/high-ttft-investigation"
+          impact: "Slight degradation in TTFT over several days. Needs investigation during business hours."

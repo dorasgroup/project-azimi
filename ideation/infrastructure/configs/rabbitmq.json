@@ -1,0 +1,40 @@
+{
+  "rabbit_version": "3.12",
+  "users": [
+    {"name": "admin", "password_hash": "...", "tags": "administrator"},
+    {"name": "core_api", "password_hash": "...", "tags": ""},
+    {"name": "worker", "password_hash": "...", "tags": ""}
+  ],
+  "vhosts": [{"name": "/"}],
+  "permissions": [
+    {"user": "admin", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
+    {"user": "core_api", "vhost": "/", "configure": "", "write": ".*", "read": ""},
+    {"user": "worker", "vhost": "/", "configure": "", "write": ".*", "read": ".*"}
+  ],
+  "exchanges": [
+    {"name": "documents.events", "vhost": "/", "type": "direct", "durable": true},
+    {"name": "ingestion.dlq", "vhost": "/", "type": "direct", "durable": true}
+  ],
+  "queues": [
+    {
+      "name": "ingestion.jobs",
+      "vhost": "/",
+      "durable": true,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-dead-letter-exchange": "ingestion.dlq",
+        "x-dead-letter-routing-key": "job.dlq"
+      }
+    },
+    {
+      "name": "ingestion.dlq.queue",
+      "vhost": "/",
+      "durable": true,
+      "arguments": {"x-queue-type": "quorum"}
+    }
+  ],
+  "bindings": [
+    {"source": "documents.events", "vhost": "/", "destination": "ingestion.jobs", "destination_type": "queue", "routing_key": "job.process"},
+    {"source": "ingestion.dlq", "vhost": "/", "destination": "ingestion.dlq.queue", "destination_type": "queue", "routing_key": "job.dlq"}
+  ]
+}

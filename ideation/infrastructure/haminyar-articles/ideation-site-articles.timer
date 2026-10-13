@@ -1,0 +1,11 @@
+[Unit]
+Description=Automatic Haminyar article synchronization every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+AccuracySec=15s
+Unit=ideation-site-articles.service
+
+[Install]
+WantedBy=timers.target

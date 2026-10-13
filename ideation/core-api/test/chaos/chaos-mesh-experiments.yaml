@@ -1,0 +1,42 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: rabbitmq-network-delay
+  namespace: chaos-testing
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - application
+    labelSelectors:
+      app: core-api
+  delay:
+    latency: '500ms' # Simulate network degradation to RabbitMQ
+    correlation: '100'
+    jitter: '0ms'
+  direction: to
+  target:
+    selector:
+      namespaces:
+        - infrastructure
+      labelSelectors:
+        app: rabbitmq
+  duration: '10m'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: worker-random-kill
+  namespace: chaos-testing
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - application
+    labelSelectors:
+      app: ingestion-worker
+  duration: '5m'
+  scheduler:
+    cron: '@every 2m' # Randomly kill a worker pod every 2 mins to test Idempotency

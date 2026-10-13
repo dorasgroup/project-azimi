@@ -1,0 +1,158 @@
+version: '3.8'
+
+services:
+  # ================= DATA LAYER =================
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ideation_rag
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - data-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - data-net
+      - worker-net
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - data-net
+
+  weaviate:
+    image: semitechnologies/weaviate:1.24.1
+    ports:
+      - "8082:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - ai-net
+
+  # ================= APPLICATION LAYER =================
+  api-gateway:
+    image: nginx:alpine
+    ports:
+      - "8000:80"
+    volumes:
+      - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - core-api
+      - ai-gateway
+    networks:
+      - edge-net
+      - app-net
+      - data-net
+
+  core-api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/ideation_rag
+      - DIFY_BASE_URL=${DIFY_BASE_URL}
+      - DIFY_CHAT_API_KEY=${DIFY_CHAT_API_KEY}
+      - DIFY_DATASET_API_KEY=${DIFY_DATASET_API_KEY}
+      - DIFY_DATASET_ID=${DIFY_DATASET_ID}
+      - DIFY_WEAVIATE_URL=${DIFY_WEAVIATE_URL}
+      - DIFY_WEAVIATE_API_KEY=${DIFY_WEAVIATE_API_KEY:-}
+      - CORS_ALLOWED_ORIGINS=${PUBLIC_APP_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-net
+      - data-net
+
+  ai-gateway:
+    build:
+      context: ../ai-gateway
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=development
+    networks:
+      - app-net
+      - ai-net
+
+  ingestion-worker:
+    build:
+      context: ../ingestion-worker
+      dockerfile: Dockerfile
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=rpc://
+    depends_on:
+      - rabbitmq
+    networks:
+      - worker-net
+      - data-net
+      - ai-net
+
+  # ================= OBSERVABILITY LAYER =================
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - obs-net
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    networks:
+      - obs-net
+
+networks:
+  edge-net:
+  app-net:
+  worker-net:
+  data-net:
+  ai-net:
+  obs-net:
+
+volumes:
+  pg_data:
+  minio_data:
+  weaviate_data:

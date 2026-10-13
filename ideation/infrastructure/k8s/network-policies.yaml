@@ -1,0 +1,47 @@
+# Default Deny All ingress and egress for Application Namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: application
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# Allow Ingress to Application from Edge (Nginx Gateway)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-edge-to-app
+  namespace: application
+spec:
+  podSelector:
+    matchLabels:
+      app: core-api
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: edge
+---
+# Allow Core API Egress to Data Platform (PostgreSQL, RabbitMQ)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-app-to-data
+  namespace: application
+spec:
+  podSelector:
+    matchLabels:
+      app: core-api
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: data-platform

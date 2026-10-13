@@ -1,0 +1,4 @@
+volumes:
+  postgres_data:
+    external: true
+    name: infrastructure_pg_data

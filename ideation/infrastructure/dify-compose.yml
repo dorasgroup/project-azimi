@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  dify-api:
+    image: langgenius/dify-api:latest
+    environment:
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=dify
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    ports:
+      - "5001:5001"
+    networks:
+      - ai-net
+      - data-net
+
+  dify-worker:
+    image: langgenius/dify-api:latest
+    command: celery -A core.celery worker -l INFO
+    environment:
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=postgres
+      - DB_DATABASE=dify
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    networks:
+      - data-net
+      - ai-net
+
+  dify-web:
+    image: langgenius/dify-web:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - CONSOLE_API_URL=http://dify-api:5001
+      - APP_API_URL=http://dify-api:5001
+    networks:
+      - ai-net
+
+networks:
+  ai-net:
+    external: true
+  data-net:
+    external: true

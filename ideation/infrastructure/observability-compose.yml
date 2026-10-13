@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.95.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ../observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    networks:
+      - obs-net
+      - ai-net
+
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    volumes:
+      - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../observability/alerts:/etc/prometheus/alerts
+      - prom_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - obs-net
+
+  loki:
+    image: grafana/loki:2.9.4
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    networks:
+      - obs-net
+
+  tempo:
+    image: grafana/tempo:2.4.0
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "3200:3200" # Tempo
+    networks:
+      - obs-net
+
+  grafana:
+    image: grafana/grafana:10.3.3
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    networks:
+      - obs-net
+
+volumes:
+  prom_data:
+
+networks:
+  obs-net:
+    external: true
+  ai-net:
+    external: true

@@ -1,0 +1,164 @@
+groups:
+  - name: ideation-operational-alerts
+    interval: 30s
+    rules:
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Internal RabbitMQ target is down
+          description: RabbitMQ metrics have been unavailable for two minutes.
+  
+      - alert: IngestionWorkerDown
+        expr: up{job="ingestion-worker"} == 0 or ideation_ingestion_worker_active < 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Ingestion worker is unavailable
+          description: The single initial ingestion worker has been unavailable for two minutes.
+  
+      - alert: IngestionQueueBacklog
+        expr: rabbitmq_queue_messages_ready{queue="ideation.ingestion.jobs.v1"} > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Ingestion queue backlog is sustained
+          description: More than five jobs have waited behind the initial single worker for ten minutes.
+  
+      - alert: IngestionFailureRateHigh
+        expr: sum(increase(ideation_ingestion_worker_failures_total[10m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Ingestion failures are elevated
+          description: At least three classified worker failures occurred in ten minutes.
+  
+      - alert: EnqueueFailure
+        expr: increase(ideation_ingestion_enqueue_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: An ingestion job could not be published
+          description: A recoverable enqueue failure was recorded recently.
+  
+      - alert: IngestionProcessingStalled
+        expr: ideation_ingestion_worker_tasks_in_progress > 0
+        for: 4m
+        labels:
+          severity: warning
+        annotations:
+          summary: Ingestion processing exceeded its hard time budget
+          description: A task has remained active longer than the configured worker time limit.
+  
+      - alert: DifyIndexingErrors
+        expr: sum(increase(ideation_ingestion_worker_failures_total{error_type=~"dify_.*|provider_auth"}[10m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Dify indexing errors are elevated
+          description: Repeated bounded indexing-provider failures were recorded by the worker.
+  
+      - alert: BackendDown
+        expr: up{job="ideation-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Ideation Backend scrape target is down
+          description: The internal Backend metrics target has been unavailable for two minutes.
+  
+      - alert: SustainedHttp5xxRate
+        expr: |
+          (
+            sum(rate(ideation_http_requests_total{status_class="5xx"}[5m]))
+            /
+            sum(rate(ideation_http_requests_total[5m]))
+          ) > 0.05
+          and sum(rate(ideation_http_requests_total[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Ideation Backend has a sustained HTTP 5xx rate
+          description: More than five percent of requests are 5xx with meaningful traffic.
+  
+      - alert: ChatLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(ideation_chat_duration_seconds_bucket[15m]))
+          ) > 15
+          and sum(rate(ideation_chat_requests_total[15m])) > 0.01
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Ideation Chat latency is above the initial Phase 2 threshold
+          description: Chat p95 has remained above 15 seconds with sufficient request traffic.
+  
+      - alert: UploadFailureRateHigh
+        expr: |
+          (
+            sum(rate(ideation_upload_results_total{outcome="failure"}[10m]))
+            /
+            sum(rate(ideation_upload_received_total[10m]))
+          ) > 0.10
+          and sum(rate(ideation_upload_received_total[10m])) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Ideation Upload failure rate is elevated
+          description: Upload failures exceed ten percent with sufficient request traffic.
+  
+      - alert: DifyErrorsOrTimeouts
+        expr: |
+          sum(increase(ideation_dependency_requests_total{
+            dependency="dify",outcome=~"http_error|transport_error|timeout"
+          }[10m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Dify dependency errors are persistent
+          description: At least three bounded Dify errors or timeouts occurred in ten minutes.
+  
+      - alert: WeaviateErrors
+        expr: |
+          sum(increase(ideation_dependency_requests_total{
+            dependency="weaviate",outcome=~"http_error|transport_error|timeout"
+          }[10m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Weaviate dependency errors are persistent
+          description: At least three bounded Weaviate errors occurred in ten minutes.
+  
+      - alert: WeaviateFallbackRateHigh
+        expr: |
+          sum(increase(ideation_ai_fallbacks_total{
+            from_dependency="weaviate",to_dependency="dify"
+          }[15m])) >= 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Weaviate to Dify fallback is elevated
+          description: Five or more controlled retrieval fallbacks occurred in fifteen minutes.
+  
+      - alert: PrometheusTargetDown
+        expr: up{job!="ideation-backend"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: An internal Prometheus scrape target is down
+          description: A non-Backend internal scrape target has been unavailable for five minutes.

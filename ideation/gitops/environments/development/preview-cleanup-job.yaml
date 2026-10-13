@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-preview-environments
+  namespace: argo-workflows
+spec:
+  schedule: "0 2 * * *" # Runs every day at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: preview-cleaner-sa
+          containers:
+          - name: cleaner
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Finding expired preview namespaces..."
+              # Find namespaces labeled as preview that are older than 3 days
+              kubectl get ns -l environment=preview -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}' | while read ns ts; do
+                AGE_DAYS=$(( ($(date +%s) - $(date -d "$ts" +%s)) / 86400 ))
+                if [ $AGE_DAYS -gt 3 ]; then
+                  echo "Deleting expired preview environment: $ns (Age: $AGE_DAYS days)"
+                  kubectl delete ns $ns
+                fi
+              done
+          restartPolicy: OnFailure

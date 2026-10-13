@@ -1,0 +1,75 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1500
+    spike_limit_mib: 512
+
+  # Redaction Pipeline (Privacy Guard)
+  attributes/redact:
+    actions:
+      - key: http.request.header.authorization
+        action: update
+        value: "[MASKED]"
+      - key: llm.prompt.text
+        action: delete
+      - key: llm.completion.text
+        action: delete
+
+  # Tail-based Sampling: Keep all errors, drop 95% of healthy traces
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 10000
+    expected_new_traces_per_sec: 100
+    policies:
+      [
+        {
+          name: keep-errors,
+          type: status_code,
+          status_code: {status_codes: [ERROR]}
+        },
+        {
+          name: sample-success,
+          type: probabilistic,
+          probabilistic: {sampling_percentage: 5}
+        }
+      ]
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: "ai_platform"
+
+  loki:
+    endpoint: "http://loki:3100/loki/api/v1/push"
+
+  otlp/tempo:
+    endpoint: "tempo:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/redact, tail_sampling, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/redact, batch]
+      exporters: [loki]

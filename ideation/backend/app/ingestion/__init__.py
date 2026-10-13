@@ -1,0 +1,1 @@
+"""Production asynchronous ingestion implementation."""

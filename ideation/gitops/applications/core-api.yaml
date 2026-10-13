@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: core-api-production
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/my-org/ai-platform-gitops.git'
+    path: environments/production/core-api
+    targetRevision: main
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: application
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true # Automatically corrects manual drift in production
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
