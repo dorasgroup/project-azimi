@@ -41,11 +41,13 @@ class BaleClient:
             return None
 
     def _request(self, method, payload=None):
-        for attempt in range(2):
+        # Repeating sendMessage after a timeout or server error can deliver the same text twice.
+        retryable = payload is None
+        for attempt in range(2 if retryable else 1):
             try:
                 response=(self.http_client.post(self._url(method),json=payload,timeout=self.timeout) if payload is not None else self.http_client.get(self._url(method),timeout=self.timeout))
             except (httpx.TimeoutException, httpx.NetworkError):
-                if attempt==0:
+                if retryable and attempt==0:
                     time.sleep(0.1)
                     continue
                 raise BaleClientError("ارتباط با API بله برقرار نشد.")
@@ -55,14 +57,14 @@ class BaleClient:
                 data=None
             retry_after=self._retry_after(response,data)
             if response.status_code==429:
-                if attempt==0:
+                if retryable and attempt==0:
                     time.sleep(min(retry_after or 0.1, 1))
                     continue
                 raise BaleClientError("محدودیت ارسال بله اعمال شده است.",status_code=429,retry_after=retry_after)
             if response.status_code in (401,403):
                 raise BaleClientError("دسترسی ربات بله پذیرفته نشد.",status_code=response.status_code)
             if response.status_code>=500:
-                if attempt==0:
+                if retryable and attempt==0:
                     time.sleep(0.1)
                     continue
                 raise BaleClientError("سرویس بله موقتاً در دسترس نیست.",status_code=response.status_code)

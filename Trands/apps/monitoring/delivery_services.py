@@ -199,7 +199,7 @@ def sync_bale_destinations(*, client=None):
     return list(BaleDestination.objects.filter(is_active=True))
 
 
-def dispatch_bale_deliveries(*, delivery_enqueuer=None, client=None, clusters=None, force_resend=False):
+def dispatch_bale_deliveries(*, delivery_enqueuer=None, client=None, clusters=None):
     """
     Find all un-delivered (or specified) trending/confirmed clusters for each active BaleDestination,
     create Delivery records, and enqueue execute_bale_delivery.
@@ -235,19 +235,7 @@ def dispatch_bale_deliveries(*, delivery_enqueuer=None, client=None, clusters=No
                 continue
 
             try:
-                if force_resend:
-                    existing_delivered = Delivery.objects.filter(
-                        destination=destination,
-                        trend_cluster=cluster,
-                        status=Delivery.Status.DELIVERED,
-                    ).exists()
-                    if existing_delivered:
-                        delivery = create_resend_delivery(destination=destination, cluster=cluster)
-                        created = True
-                    else:
-                        delivery, created = create_delivery(destination=destination, cluster=cluster)
-                else:
-                    delivery, created = create_delivery(destination=destination, cluster=cluster)
+                delivery, created = create_delivery(destination=destination, cluster=cluster)
             except Exception:
                 continue
 

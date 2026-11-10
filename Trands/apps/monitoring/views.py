@@ -1026,16 +1026,9 @@ class SendTrendDeliveryView(StaffRequiredMixin,View):
         try:
             delivery,created=create_delivery(destination=destination,cluster=cluster)
         except ValueError as exc:
-            if Delivery.objects.filter(destination=destination,trend_cluster=cluster,status=Delivery.Status.DELIVERED).exists():
-                delivery=create_resend_delivery(destination=destination,cluster=cluster)
-                created=True
-            else:
-                messages.error(request,str(exc));return redirect("monitoring:trend_cluster_detail",pk=pk)
-        if not created and delivery.status==Delivery.Status.DELIVERED:
-            delivery=create_resend_delivery(destination=destination,cluster=cluster)
-            created=True
+            messages.error(request,str(exc));return redirect("monitoring:trend_cluster_detail",pk=pk)
         record_audit(actor=request.user,operation="bale_delivery_create",instance=delivery)
-        if created or delivery.status!=Delivery.Status.DELIVERED: execute_bale_delivery.delay(delivery.pk)
+        if created: execute_bale_delivery.delay(delivery.pk)
         return redirect("monitoring:delivery_detail",pk=delivery.pk)
 
 
@@ -1053,7 +1046,7 @@ class RunBaleDispatchView(StaffRequiredMixin, View):
         if run.requested_start_at:
             run_trends = run_trends.filter(last_published_at__gte=run.requested_start_at)
         from .delivery_services import dispatch_bale_deliveries
-        delivery_ids = dispatch_bale_deliveries(clusters=run_trends, force_resend=True)
+        delivery_ids = dispatch_bale_deliveries(clusters=run_trends)
         record_audit(actor=request.user, operation="bale_run_dispatch", instance=run, metadata={"deliveries_count": len(delivery_ids)})
         if delivery_ids:
             messages.success(request, f"{len(delivery_ids)} گزارش ترند با موفقیت در صف ارسال به مقاصد فعال بله قرار گرفت.")

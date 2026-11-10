@@ -96,6 +96,26 @@ def test_report_keywords_match_representative_text_and_cluster_topic():
 
 
 @pytest.mark.django_db
+def test_report_uses_representative_post_link_when_source_has_multiple_items():
+    record=cluster(text="متن نماینده")
+    source_record=record.representative.source
+    other_item=ContentItem.objects.create(
+        source=source_record,
+        external_id="other-post",
+        published_at=timezone.now(),
+        raw_text="متن مشابه",
+        normalized_text="متن مشابه",
+        public_url="https://t.me/sourcechannel/other-post",
+    )
+    ClusterItem.objects.create(cluster=record,content_item=other_item,link_type="near_duplicate",similarity=0.9)
+
+    report=format_trend_report(record)
+
+    assert record.representative.public_url in report
+    assert other_item.public_url not in report
+
+
+@pytest.mark.django_db
 def test_report_formatter_handles_missing_optional_data():
     record=cluster(text="")
     record.representative=None;record.platforms=[];record.save()
@@ -137,6 +157,17 @@ def test_rate_limit_timeout_server_error_and_invalid_response_fail_safely(monkey
         failed=send_delivery(delivery.pk,client=BaleClient(token="test",http_client=FakeHTTP(responses)))
         assert failed.status==Delivery.Status.FAILED and expected in failed.error_summary
     assert Delivery.objects.filter(destination=destination,retry_after_at__isnull=False).exists()
+
+
+@pytest.mark.parametrize("failure", [
+    lambda: (_ for _ in ()).throw(httpx.TimeoutException("timeout")),
+    FakeResponse(500, {}),
+])
+def test_send_message_does_not_retry_after_ambiguous_failure(failure):
+    http = FakeHTTP([failure, FakeResponse(data={"ok": True, "result": {"message_id": 77}})])
+    with pytest.raises(BaleClientError):
+        BaleClient(token="test", http_client=http).send_message("-1003", "خبر")
+    assert len(http.calls) == 1
 
 
 @pytest.mark.django_db
@@ -352,7 +383,7 @@ def test_dispatch_bale_deliveries_creates_and_enqueues():
 
 
 @pytest.mark.django_db
-def test_dispatch_bale_deliveries_manual_run_with_force_resend():
+def test_dispatch_bale_deliveries_does_not_resend_delivered_cluster():
     from datetime import timedelta
     from django.utils import timezone
     from apps.monitoring.delivery_services import dispatch_bale_deliveries
@@ -363,9 +394,48 @@ def test_dispatch_bale_deliveries_manual_run_with_force_resend():
     Delivery.objects.create(destination=dest, trend_cluster=c, report_version=1, status=Delivery.Status.DELIVERED, delivered_at=timezone.now() - timedelta(minutes=10))
 
     enqueued = []
-    delivery_ids = dispatch_bale_deliveries(clusters=[c], force_resend=True, delivery_enqueuer=lambda pk: enqueued.append(pk))
-    assert len(delivery_ids) == 1
-    d2 = Delivery.objects.get(pk=delivery_ids[0])
-    assert d2.report_version == 2
-    assert d2.status == Delivery.Status.PENDING
+    delivery_ids = dispatch_bale_deliveries(clusters=[c], delivery_enqueuer=lambda pk: enqueued.append(pk))
+    assert delivery_ids == enqueued == []
+    assert Delivery.objects.filter(destination=dest, trend_cluster=c).count() == 1
+
+
+@pytest.mark.django_db
+def test_manual_collection_does_not_request_resend(monkeypatch):
+    from apps.monitoring.collection_services import create_manual_run
+    from apps.monitoring import tasks
+    from apps.monitoring.delivery_services import dispatch_bale_deliveries
+
+    destination = BaleDestination.objects.create(name="مقصد رصد", chat_id="999890")
+    record = cluster()
+    Delivery.objects.create(destination=destination, trend_cluster=record, status=Delivery.Status.DELIVERED)
+    run = create_manual_run()
+    monkeypatch.setattr(tasks, "execute_run", lambda current: current)
+    monkeypatch.setattr(tasks, "create_analysis_run", lambda: object())
+    monkeypatch.setattr(tasks, "execute_analysis", lambda *args, **kwargs: None)
+    enqueued = []
+    monkeypatch.setattr("apps.monitoring.delivery_services.dispatch_bale_deliveries", lambda **kwargs: dispatch_bale_deliveries(delivery_enqueuer=enqueued.append, **kwargs))
+
+    assert tasks.execute_collection_run(run.pk) == run.pk
+    assert enqueued == []
+    assert Delivery.objects.filter(destination=destination, trend_cluster=record).count() == 1
+
+
+@pytest.mark.django_db
+def test_run_send_and_trend_send_do_not_repeat_delivered_report(client, monkeypatch):
+    from apps.monitoring.collection_services import create_manual_run
+    from apps.monitoring.delivery_services import dispatch_bale_deliveries
+
+    staff = get_user_model().objects.create_user("no_duplicate_staff", password="password", is_staff=True)
+    client.force_login(staff)
+    destination = BaleDestination.objects.create(name="مقصد بدون تکرار", chat_id="999891")
+    record = cluster()
+    Delivery.objects.create(destination=destination, trend_cluster=record, status=Delivery.Status.DELIVERED)
+    run = create_manual_run()
+    enqueued = []
+    monkeypatch.setattr("apps.monitoring.delivery_services.dispatch_bale_deliveries", lambda **kwargs: dispatch_bale_deliveries(delivery_enqueuer=enqueued.append, **kwargs))
+
+    assert client.post(reverse("monitoring:run_bale_send", args=[run.pk])).status_code == 302
+    assert client.post(reverse("monitoring:trend_bale_send", args=[record.pk]), {"destination": destination.pk}).status_code == 302
+    assert enqueued == []
+    assert Delivery.objects.filter(destination=destination, trend_cluster=record).count() == 1
 

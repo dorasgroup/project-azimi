@@ -44,7 +44,7 @@ def execute_collection_run(run_id):
             if run.requested_start_at:
                 run_trends = run_trends.filter(last_published_at__gte=run.requested_start_at)
             is_manual = run.run_type in (CollectionRun.RunType.MANUAL, CollectionRun.RunType.RECENT_DAYS)
-            dispatch_bale_deliveries(clusters=run_trends if is_manual else None, force_resend=is_manual)
+            dispatch_bale_deliveries(clusters=run_trends if is_manual else None)
         return run.pk
     return _run_in_dev_thread_or_sync(_execute)
 
